@@ -3,10 +3,11 @@ import { ArrowLeft, ClipboardList, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { CaseFlowPageSkeleton } from '@/components/common/page-skeletons';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { listPuzzles } from '@/lib/api/cases';
+import { getFirstPuzzleOrder, listPuzzles, sortPuzzlesByOrder } from '@/lib/api/cases';
 import { getProgress } from '@/lib/api/progress';
 
 export default function InvestigationBoard() {
@@ -23,8 +24,7 @@ export default function InvestigationBoard() {
     Promise.all([listPuzzles(caseId), getProgress(caseId).catch(() => null)])
       .then(([pz, prog]) => {
         if (cancelled) return;
-        const list = [...(pz?.puzzles || [])].sort((a, b) => a.order - b.order);
-        setPuzzles(list);
+        setPuzzles(sortPuzzlesByOrder(pz?.puzzles || []));
         setProgressRow(prog && (prog.case_id || prog.current_puzzle != null) ? prog : null);
       })
       .catch((e) => {
@@ -40,13 +40,16 @@ export default function InvestigationBoard() {
 
   const clues = useMemo(() => {
     if (!puzzles.length) return [];
+    const firstOrder = getFirstPuzzleOrder(puzzles);
     const nextOrder = progressRow?.is_completed
       ? Infinity
       : progressRow?.current_puzzle != null
-        ? progressRow.current_puzzle
-        : 1;
+        ? Number(progressRow.current_puzzle)
+        : firstOrder;
     return puzzles
-      .filter((p) => progressRow?.is_completed || p.order < nextOrder)
+      .filter((p) =>
+        progressRow?.is_completed || Number(p.order) < nextOrder,
+      )
       .map((p) => ({
         id: String(p.id),
         title: `Puzzle ${p.order}`,
@@ -65,9 +68,10 @@ export default function InvestigationBoard() {
 
   if (loading) {
     return (
-      <div className='min-h-screen bg-[#f8f9ff] flex items-center justify-center'>
-        <p className='text-gray-600'>Memuat papan investigasi…</p>
-      </div>
+      <CaseFlowPageSkeleton
+        shellClassName='min-h-screen bg-[#f8f9ff]'
+        innerMax='max-w-5xl'
+      />
     );
   }
 

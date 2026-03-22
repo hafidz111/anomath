@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle, Clock, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { CaseFlowPageSkeleton } from '@/components/common/page-skeletons';
 import { AnomathLogo } from '@/components/branding/anomath-logo';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getCase, listPuzzles } from '@/lib/api/cases';
+import { getCase, listPuzzles, sortPuzzlesByOrder } from '@/lib/api/cases';
 import { getProgress } from '@/lib/api/progress';
 
 const difficultyTheme = {
@@ -24,19 +25,22 @@ function capDiff(d) {
 export default function CaseStory() {
   const { caseId } = useParams();
   const [caseData, setCaseData] = useState(null);
-  const [puzzleCount, setPuzzleCount] = useState(0);
+  const [sortedPuzzles, setSortedPuzzles] = useState([]);
   const [progressRow, setProgressRow] = useState(null);
-  const [resetMessage, setResetMessage] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
-    Promise.all([getCase(caseId), listPuzzles(caseId), getProgress(caseId).catch(() => null)])
+    Promise.all([
+      getCase(caseId),
+      listPuzzles(caseId),
+      getProgress(caseId).catch(() => null),
+    ])
       .then(([c, pz, prog]) => {
         if (cancelled) return;
         setCaseData(c);
-        setPuzzleCount(pz?.puzzles?.length ?? 0);
+        setSortedPuzzles(sortPuzzlesByOrder(pz?.puzzles || []));
         setProgressRow(prog && prog.case_id ? prog : null);
       })
       .catch((e) => {
@@ -51,42 +55,51 @@ export default function CaseStory() {
   }, [caseId]);
 
   const stages = useMemo(() => {
-    const n = puzzleCount || 1;
-    return Array.from({ length: n }, (_, i) => ({
-      number: i + 1,
-      title: `Stage ${i + 1}`,
-      topic: 'Math puzzle',
+    return sortedPuzzles.map((p, i) => ({
+      displayIndex: i + 1,
+      order: Number(p.order),
+      title: `Puzzle ${i + 1}`,
+      topic: p.difficulty ? capDiff(p.difficulty) : 'Math puzzle',
+      puzzleType: p.puzzle_meta?.puzzleType || 'Multiple Choice',
     }));
-  }, [puzzleCount]);
+  }, [sortedPuzzles]);
 
-  const completedStages = useMemo(() => {
-    if (!progressRow || !puzzleCount) return [];
-    if (progressRow.is_completed) return stages.map((s) => s.number);
-    const nextOrder = progressRow.current_puzzle;
-    const done = [];
-    for (let o = 1; o < nextOrder; o += 1) done.push(o);
-    return done;
-  }, [progressRow, puzzleCount, stages]);
+  const completedDisplayIndices = useMemo(() => {
+    if (!sortedPuzzles.length) return [];
+    if (progressRow?.is_completed) {
+      return sortedPuzzles.map((_, i) => i + 1);
+    }
+    if (!progressRow?.current_puzzle) return [];
+    const nextIdx = sortedPuzzles.findIndex(
+      (p) => Number(p.order) === Number(progressRow.current_puzzle),
+    );
+    if (nextIdx <= 0) return [];
+    return sortedPuzzles.slice(0, nextIdx).map((_, i) => i + 1);
+  }, [progressRow, sortedPuzzles]);
 
-  const nextStage =
-    stages.find((stage) => !completedStages.includes(stage.number))?.number ?? null;
+  const puzzleEntryHref = useMemo(() => {
+    if (!sortedPuzzles.length) return `/student`;
+    if (progressRow?.is_completed) {
+      return `/case/${caseId}/board`;
+    }
+    const next = sortedPuzzles.find(
+      (p) => Number(p.order) === Number(progressRow?.current_puzzle),
+    );
+    const target = next ?? sortedPuzzles[0];
+    if (!target) return `/student`;
+    return `/puzzle/${caseId}?stage=${target.order}`;
+  }, [caseId, sortedPuzzles, progressRow]);
+
   const progressPercent = stages.length
-    ? Math.round((completedStages.length / stages.length) * 100)
+    ? Math.round((completedDisplayIndices.length / stages.length) * 100)
     : 0;
-
-  const handleResetProgress = () => {
-    setResetMessage('Reset progres hanya via backend / admin.');
-    setTimeout(() => setResetMessage(''), 2000);
-  };
 
   const diffKey = (caseData?.difficulty || 'easy').toLowerCase();
   const diffBadge = difficultyTheme[diffKey] || difficultyTheme.easy;
 
   if (loading) {
     return (
-      <div className='min-h-screen bg-white flex items-center justify-center'>
-        <p className='text-gray-600'>Memuat case…</p>
-      </div>
+      <CaseFlowPageSkeleton shellClassName='min-h-screen bg-linear-to-br from-purple-50 via-blue-50 to-pink-50' />
     );
   }
 
@@ -100,6 +113,13 @@ export default function CaseStory() {
       </div>
     );
   }
+
+  const continueLabel =
+    progressRow?.is_completed
+      ? 'Lanjut ke papan investigasi'
+      : completedDisplayIndices.length
+        ? 'Lanjut puzzle'
+        : 'Mulai puzzle';
 
   return (
     <div className='min-h-screen bg-linear-to-br from-purple-50 via-blue-50 to-pink-50'>
@@ -126,7 +146,7 @@ export default function CaseStory() {
                 {capDiff(caseData?.difficulty)}
               </span>
               <span className='text-sm text-gray-500 flex items-center gap-1'>
-                <Clock className='w-4 h-4' /> Est. {Math.max(5, (puzzleCount || 1) * 5)} min
+                <Clock className='w-4 h-4' /> Est. {Math.max(5, (sortedPuzzles.length || 1) * 5)} min
               </span>
             </div>
             <h1 className='text-3xl font-bold text-gray-900 mb-3'>{caseData?.title}</h1>
@@ -136,30 +156,39 @@ export default function CaseStory() {
 
         <Card className='rounded-2xl border border-gray-200 bg-white'>
           <CardContent className='p-6'>
-            <h2 className='text-xl font-bold text-gray-900 mb-4'>Stages</h2>
+            <h2 className='text-xl font-bold text-gray-900 mb-4'>Alur puzzle</h2>
+            <p className='text-sm text-gray-600 mb-4'>
+              Urutan sama dengan Case Builder (field <span className='font-mono'>order</span> di server).
+              Tipe soal ditampilkan ke siswa sesuai pengaturan guru.
+            </p>
             <div className='space-y-3'>
               {stages.map((stage) => (
                 <div
-                  key={stage.number}
+                  key={`${stage.order}-${stage.displayIndex}`}
                   className='flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100'
                 >
-                  <div className='flex items-center gap-3'>
-                    <span className='w-8 h-8 rounded-lg bg-purple-100 text-purple-700 font-bold flex items-center justify-center'>
-                      {stage.number}
+                  <div className='flex items-center gap-3 min-w-0'>
+                    <span className='w-8 h-8 shrink-0 rounded-lg bg-purple-100 text-purple-700 font-bold flex items-center justify-center'>
+                      {stage.displayIndex}
                     </span>
-                    <div>
+                    <div className='min-w-0'>
                       <p className='font-semibold text-gray-900'>{stage.title}</p>
-                      <p className='text-sm text-gray-600'>{stage.topic}</p>
+                      <p className='text-sm text-gray-600 truncate'>
+                        {stage.topic} · {stage.puzzleType}
+                      </p>
                     </div>
                   </div>
-                  {completedStages.includes(stage.number) ? (
-                    <CheckCircle className='w-6 h-6 text-green-600' />
+                  {completedDisplayIndices.includes(stage.displayIndex) ? (
+                    <CheckCircle className='w-6 h-6 text-green-600 shrink-0' />
                   ) : (
-                    <span className='text-xs text-gray-500'>Pending</span>
+                    <span className='text-xs text-gray-500 shrink-0'>Pending</span>
                   )}
                 </div>
               ))}
             </div>
+            {stages.length === 0 ? (
+              <p className='text-sm text-gray-500 py-2'>Belum ada puzzle di case ini.</p>
+            ) : null}
             <div className='mt-4'>
               <div className='flex justify-between text-sm mb-1'>
                 <span>Progress</span>
@@ -172,15 +201,11 @@ export default function CaseStory() {
           </CardContent>
         </Card>
 
-        <div className='flex flex-wrap gap-3 justify-between items-center'>
-          <Button variant='outline' type='button' onClick={handleResetProgress}>
-            Reset progress (info)
-          </Button>
-          {resetMessage ? <span className='text-sm text-gray-600'>{resetMessage}</span> : null}
+        <div className='flex flex-wrap gap-3 justify-end items-center'>
           <Button asChild className='bg-linear-to-r from-purple-300 to-blue-300 text-purple-700'>
-            <Link to={nextStage != null ? `/puzzle/${caseId}?stage=${nextStage}` : `/puzzle/${caseId}?stage=1`}>
+            <Link to={puzzleEntryHref}>
               <Play className='w-4 h-4 mr-2' />
-              {completedStages.length ? 'Continue' : 'Start puzzles'}
+              {continueLabel}
             </Link>
           </Button>
         </div>

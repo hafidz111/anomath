@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   GraduationCap,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { StudentDashboardSkeleton } from '@/components/common/page-skeletons';
 import { EmptyState } from '@/components/common/empty-state';
 import { AnomathLogo } from '@/components/branding/anomath-logo';
 import { LogoutButton } from '@/components/auth/logout-button';
@@ -60,6 +61,7 @@ function studentClassHref(c) {
 }
 
 export default function StudentDashboard() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const codeFilter = searchParams.get('code')?.trim() || null;
   const legacyClassIdFilter = searchParams.get('class_id')?.trim() || null;
@@ -151,25 +153,41 @@ export default function StudentDashboard() {
     };
   }, [codeFilter, legacyClassIdFilter]);
 
-  async function applyMembershipAndCases(mine) {
+  /**
+   * Muat case untuk konteks kelas. `listScope` dipakai setelah join saat URL belum
+   * punya ?code= / ?class_id= — tanpa ini listCases hanya { page_size } dan case terikat kelas hilang.
+   * @param {object} [listScope]
+   * @param {string} [listScope.joinCode]
+   * @param {string|number} [listScope.classId]
+   */
+  async function applyMembershipAndCases(mine, listScope = null) {
     setMyClasses(mine);
+    const joinCode =
+      (listScope?.joinCode && String(listScope.joinCode).trim()) ||
+      codeFilter ||
+      null;
+    const classIdRaw =
+      listScope?.classId != null && String(listScope.classId) !== ''
+        ? String(listScope.classId)
+        : legacyClassIdFilter;
+
     const ids = new Set(mine.map((c) => String(c.id)));
     let needJoin = false;
-    if (codeFilter) {
-      const up = codeFilter.toUpperCase();
+    if (joinCode) {
+      const up = joinCode.toUpperCase();
       needJoin = !mine.some(
         (c) => String(c.join_code || '').toUpperCase() === up,
       );
-    } else if (legacyClassIdFilter) {
-      needJoin = !ids.has(String(legacyClassIdFilter));
+    } else if (classIdRaw) {
+      needJoin = !ids.has(String(classIdRaw));
     }
     if (needJoin) {
       setCasesList([]);
       return;
     }
     const listParams = { page_size: 50 };
-    if (codeFilter) listParams.code = codeFilter;
-    else if (legacyClassIdFilter) listParams.class_id = legacyClassIdFilter;
+    if (joinCode) listParams.code = joinCode;
+    else if (classIdRaw) listParams.class_id = classIdRaw;
     const casesRes = await listCases(listParams).catch(() => ({ cases: [] }));
     setCasesList(casesRes?.cases || []);
   }
@@ -184,9 +202,10 @@ export default function StudentDashboard() {
     try {
       await joinStudentClass({ join_code: code });
       toast.success('Berhasil bergabung ke kelas');
-      setJoinCodeInput('');
       const myRes = await fetchMyClasses().catch(() => ({ classes: [] }));
-      await applyMembershipAndCases(myRes?.classes ?? []);
+      await applyMembershipAndCases(myRes?.classes ?? [], { joinCode: code });
+      setJoinCodeInput('');
+      navigate(`/student?code=${encodeURIComponent(code)}`, { replace: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal bergabung');
     } finally {
@@ -205,7 +224,11 @@ export default function StudentDashboard() {
         classes: [],
       }));
       setPublicClasses(pubRes?.classes ?? []);
-      await applyMembershipAndCases(mine);
+      await applyMembershipAndCases(mine, { classId: classId });
+      navigate(
+        `/student?class_id=${encodeURIComponent(String(classId))}`,
+        { replace: true },
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal bergabung');
     } finally {
@@ -221,11 +244,11 @@ export default function StudentDashboard() {
       score: totalScore,
       level: Math.max(1, Math.floor(totalScore / 500) + 1),
       casesCompleted,
-      totalCases: casesList.length || 1,
+      totalCases: Math.max(1, new Set((casesList || []).map((c) => c.id)).size),
       rank: '—',
       streak: '—',
     };
-  }, [me, progressList, casesList.length]);
+  }, [me, progressList, casesList]);
 
   const currentCase = useMemo(() => {
     const inProg = progressList.find((p) => !p.is_completed);
@@ -256,27 +279,106 @@ export default function StudentDashboard() {
     };
   }, [casesList, progressList]);
 
-  const availableCases = useMemo(() => {
-    return casesList.map((c, i) => ({
-      id: c.id,
-      title: c.title,
-      difficulty: capDiff(c.difficulty),
-      completed: 0,
-      points: 150 + i * 50,
-      icon: EMOJI[i % EMOJI.length],
-      color: ['blue', 'pink', 'yellow', 'purple'][i % 4],
-      locked: false,
-    }));
+  const casesByListingOrigin = useMemo(() => {
+    const privateLike = [];
+    const publicLike = [];
+    for (const c of casesList) {
+      const o = c.student_listing_origin ?? 'private_class';
+      if (o === 'private_class' || o === 'both') privateLike.push(c);
+      if (o === 'public_class' || o === 'both') publicLike.push(c);
+    }
+    return { privateLike, publicLike };
   }, [casesList]);
+
+  const mapCaseToCard = (c, i) => ({
+    id: c.id,
+    title: c.title,
+    difficulty: capDiff(c.difficulty),
+    completed: 0,
+    points: 150 + i * 50,
+    icon: EMOJI[i % EMOJI.length],
+    color: ['blue', 'pink', 'yellow', 'purple'][i % 4],
+    locked: false,
+    listingOrigin: c.student_listing_origin ?? 'private_class',
+  });
+
+  function listingOriginBadge(origin) {
+    if (origin === 'public_class') {
+      return {
+        label: 'Kelas publik',
+        className:
+          'bg-emerald-600/15 text-emerald-900 border border-emerald-200',
+      };
+    }
+    if (origin === 'both') {
+      return {
+        label: 'Kode & publik',
+        className:
+          'bg-violet-600/15 text-violet-900 border border-violet-200',
+      };
+    }
+    return {
+      label: 'Kode kelas',
+      className: 'bg-slate-600/10 text-slate-800 border border-slate-200',
+    };
+  }
+
+  function renderCaseCard(caseItem, listKey) {
+    const badge = listingOriginBadge(caseItem.listingOrigin);
+    return (
+      <Card
+        key={`case-${caseItem.id}-${listKey}`}
+        className={`bg-linear-to-br rounded-2xl p-6 border shadow-sm hover:shadow-md transition-all ${caseTheme[caseItem.color]} ${caseItem.locked ? 'opacity-60' : ''}`}
+      >
+        <CardContent className='p-0'>
+          <div className='mb-2 flex flex-wrap items-center gap-2'>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badge.className}`}
+            >
+              {badge.label}
+            </span>
+          </div>
+          <div className='flex items-start justify-between mb-4'>
+            <div className='w-14 h-14 rounded-xl bg-white flex items-center justify-center text-3xl shadow-sm'>
+              {caseItem.locked ? (
+                <Lock className='w-7 h-7 text-gray-400' />
+              ) : (
+                caseItem.icon
+              )}
+            </div>
+            <div className='flex items-center gap-1 text-yellow-600 font-bold text-sm'>
+              <Trophy className='w-4 h-4' />
+              <span>{caseItem.points}</span>
+            </div>
+          </div>
+          <h3 className='font-bold text-gray-900 mb-2'>{caseItem.title}</h3>
+          <div className='flex items-center gap-2 mb-4'>
+            <span className='px-2 py-1 bg-white rounded-lg text-xs font-semibold'>
+              {caseItem.difficulty}
+            </span>
+          </div>
+
+          {!caseItem.locked ? (
+            <Button
+              asChild
+              className='w-full py-2 bg-white text-purple-700 rounded-xl font-semibold hover:shadow-sm transition-all'
+            >
+              <Link to={`/case/${caseItem.id}`}>Mulai</Link>
+            </Button>
+          ) : (
+            <div className='bg-white/50 rounded-xl p-3 text-center'>
+              <p className='text-xs text-gray-600'>Terkunci</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   const leaderboard = [];
 
   if (loading) {
-    return (
-      <div className='min-h-screen flex items-center justify-center bg-white'>
-        <p className='text-gray-600'>Memuat dashboard…</p>
-      </div>
-    );
+    return <StudentDashboardSkeleton />;
   }
 
   return (
@@ -516,7 +618,7 @@ export default function StudentDashboard() {
                       asChild
                       className='w-full py-6 bg-white text-purple-700 rounded-2xl font-bold text-lg hover:shadow-md transition-all'
                     >
-                      <Link to={`/puzzle/${currentCase.id}?stage=1`}>
+                      <Link to={`/case/${currentCase.id}/story`}>
                         <Play className='w-5 h-5 mr-2' />
                         Lanjut
                         <ArrowRight className='w-5 h-5 ml-2' />
@@ -529,105 +631,117 @@ export default function StudentDashboard() {
               )}
             </div>
 
-            <div>
-              <h2 className='text-2xl font-bold text-gray-900 mb-4'>Case</h2>
-              <div className='grid sm:grid-cols-2 gap-4'>
-                {publicClasses.map((c) => {
-                  const enrolled = myClasses.some(
-                    (m) => String(m.id) === String(c.id),
-                  );
-                  return (
-                    <Card
-                      key={`pub-class-${c.id}`}
-                      className='rounded-2xl border border-emerald-200 bg-linear-to-br from-emerald-50/90 to-white p-6 shadow-sm transition-all hover:shadow-md'
-                    >
-                      <CardContent className='p-0'>
-                        <div className='mb-3 flex items-start justify-between gap-2'>
-                          <span className='rounded-full bg-emerald-600/15 px-2 py-0.5 text-xs font-semibold text-emerald-800'>
-                            Publik
-                          </span>
-                          <Users className='h-5 w-5 shrink-0 text-emerald-700' />
-                        </div>
-                        <h3 className='mb-1 font-bold text-gray-900'>
-                          {c.name}
-                        </h3>
-                        <p className='mb-4 text-xs text-gray-600'>
-                          {[
-                            c.teacher_name,
-                            c.grade != null ? `Kelas ${c.grade}` : null,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ') || '—'}
-                        </p>
-                        {enrolled ? (
-                          <Button
-                            asChild
-                            className='w-full rounded-xl bg-white py-2 font-semibold text-emerald-800 hover:bg-emerald-50'
-                            variant='outline'
-                          >
-                            <Link to={studentClassHref(c)}>Buka kelas</Link>
-                          </Button>
-                        ) : (
-                          <Button
-                            type='button'
-                            className='w-full rounded-xl bg-emerald-600 py-2 font-semibold text-white hover:bg-emerald-700'
-                            disabled={joining}
-                            onClick={() => handleJoinPublicClass(c.id)}
-                          >
-                            Gabung kelas
-                          </Button>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-                {availableCases.map((caseItem) => (
-                  <Card
-                    key={caseItem.id}
-                    className={`bg-linear-to-br rounded-2xl p-6 border shadow-sm hover:shadow-md transition-all ${caseTheme[caseItem.color]} ${caseItem.locked ? 'opacity-60' : ''}`}
-                  >
-                    <CardContent className='p-0'>
-                      <div className='flex items-start justify-between mb-4'>
-                        <div className='w-14 h-14 rounded-xl bg-white flex items-center justify-center text-3xl shadow-sm'>
-                          {caseItem.locked ? (
-                            <Lock className='w-7 h-7 text-gray-400' />
+            <div className='space-y-10'>
+              <div>
+                <h2 className='text-2xl font-bold text-gray-900 mb-4'>
+                  Kelas publik
+                </h2>
+                <div className='grid sm:grid-cols-2 gap-4'>
+                  {publicClasses.map((c) => {
+                    const enrolled = myClasses.some(
+                      (m) => String(m.id) === String(c.id),
+                    );
+                    return (
+                      <Card
+                        key={`pub-class-${c.id}`}
+                        className='rounded-2xl border border-emerald-200 bg-linear-to-br from-emerald-50/90 to-white p-6 shadow-sm transition-all hover:shadow-md'
+                      >
+                        <CardContent className='p-0'>
+                          <div className='mb-3 flex items-start justify-between gap-2'>
+                            <span className='rounded-full bg-emerald-600/15 px-2 py-0.5 text-xs font-semibold text-emerald-800'>
+                              Publik
+                            </span>
+                            <Users className='h-5 w-5 shrink-0 text-emerald-700' />
+                          </div>
+                          <h3 className='mb-1 font-bold text-gray-900'>
+                            {c.name}
+                          </h3>
+                          <p className='mb-4 text-xs text-gray-600'>
+                            {[
+                              c.teacher_name,
+                              c.grade != null ? `Kelas ${c.grade}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || '—'}
+                          </p>
+                          {enrolled ? (
+                            <Button
+                              asChild
+                              className='w-full rounded-xl bg-white py-2 font-semibold text-emerald-800 hover:bg-emerald-50'
+                              variant='outline'
+                            >
+                              <Link to={studentClassHref(c)}>Buka kelas</Link>
+                            </Button>
                           ) : (
-                            caseItem.icon
+                            <Button
+                              type='button'
+                              className='w-full rounded-xl bg-emerald-600 py-2 font-semibold text-white hover:bg-emerald-700'
+                              disabled={joining}
+                              onClick={() => handleJoinPublicClass(c.id)}
+                            >
+                              Gabung kelas
+                            </Button>
                           )}
-                        </div>
-                        <div className='flex items-center gap-1 text-yellow-600 font-bold text-sm'>
-                          <Trophy className='w-4 h-4' />
-                          <span>{caseItem.points}</span>
-                        </div>
-                      </div>
-                      <h3 className='font-bold text-gray-900 mb-2'>
-                        {caseItem.title}
-                      </h3>
-                      <div className='flex items-center gap-2 mb-4'>
-                        <span className='px-2 py-1 bg-white rounded-lg text-xs font-semibold'>
-                          {caseItem.difficulty}
-                        </span>
-                      </div>
-
-                      {!caseItem.locked ? (
-                        <Button
-                          asChild
-                          className='w-full py-2 bg-white text-purple-700 rounded-xl font-semibold hover:shadow-sm transition-all'
-                        >
-                          <Link to={`/case/${caseItem.id}`}>Mulai</Link>
-                        </Button>
-                      ) : (
-                        <div className='bg-white/50 rounded-xl p-3 text-center'>
-                          <p className='text-xs text-gray-600'>Terkunci</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                {publicClasses.length === 0 ? (
+                  <p className='text-sm text-gray-500'>
+                    Belum ada kelas yang dipublikasikan.
+                  </p>
+                ) : null}
               </div>
-              {availableCases.length === 0 && publicClasses.length === 0 ? (
-                <EmptyState title='Belum ada case atau kelas publik' />
-              ) : null}
+
+              <div>
+                <h2 className='text-2xl font-bold text-gray-900 mb-2'>Case</h2>
+                <p className='mb-4 text-sm text-gray-600'>
+                  Case dari kelas yang kamu ikuti dibedakan: lewat kode (privat)
+                  atau lewat kelas publik.
+                </p>
+
+                {casesByListingOrigin.privateLike.length > 0 ? (
+                  <div className='mb-8'>
+                    <h3 className='text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2'>
+                      <Lock className='h-5 w-5 text-slate-600' />
+                      Dari kelas (kode / privat)
+                    </h3>
+                    <div className='grid sm:grid-cols-2 gap-4'>
+                      {casesByListingOrigin.privateLike.map((c, i) =>
+                        renderCaseCard(mapCaseToCard(c, i), 'priv'),
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {casesByListingOrigin.publicLike.length > 0 ? (
+                  <div>
+                    <h3 className='text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2'>
+                      <Users className='h-5 w-5 text-emerald-700' />
+                      Dari kelas publik
+                    </h3>
+                    <div className='grid sm:grid-cols-2 gap-4'>
+                      {casesByListingOrigin.publicLike.map((c, i) =>
+                        renderCaseCard(mapCaseToCard(c, i), 'pub'),
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {casesByListingOrigin.privateLike.length === 0 &&
+                casesByListingOrigin.publicLike.length === 0 &&
+                publicClasses.length === 0 ? (
+                  <EmptyState title='Belum ada case atau kelas publik' />
+                ) : null}
+                {casesByListingOrigin.privateLike.length === 0 &&
+                casesByListingOrigin.publicLike.length === 0 &&
+                publicClasses.length > 0 ? (
+                  <p className='text-sm text-gray-500'>
+                    Gabung ke kelas (kode atau publik) untuk melihat case.
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
 

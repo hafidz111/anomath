@@ -1,31 +1,59 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  CheckCircle,
   Clock,
   Lightbulb,
   Sparkles,
   Star,
   Trophy,
-  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { AnomathLogoMark } from '@/components/branding/anomath-logo';
+import { CaseFlowPageSkeleton } from '@/components/common/page-skeletons';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { getCase, listPuzzles, submitPuzzleAnswer } from '@/lib/api/cases';
+import {
+  findPuzzleByStage,
+  getCase,
+  getFirstPuzzleOrder,
+  listPuzzles,
+  sortPuzzlesByOrder,
+  submitPuzzleAnswer,
+} from '@/lib/api/cases';
+import { getProgress } from '@/lib/api/progress';
+import { StudentPuzzleResponse } from '@/features/student/student-puzzle-response';
+
+function answerHintForType(puzzleType) {
+  switch (puzzleType) {
+    case 'True/False':
+    case 'Multiple Choice':
+      return 'Pilih salah satu opsi. Perbandingan jawaban tidak case-sensitive.';
+    case 'Fill in the Blank':
+      return 'Isi jawaban teks; spasi diabaikan, huruf besar/kecil tidak mempengaruhi.';
+    case 'Ordering':
+      return 'Susun urutan dengan mengklik item; jawaban dikirim sebagai teks dipisah |.';
+    case 'Matching':
+      return 'Pilih pasangan kiri–kanan atau isi manual format kiri|kanan.';
+    default:
+      return 'Jawaban teks; perbandingan tidak case-sensitive.';
+  }
+}
 
 export default function PuzzleGame() {
   const { caseId } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const currentStage = Number(searchParams.get('stage') || 1);
+  const stageRaw = searchParams.get('stage');
+  const parsedStage =
+    stageRaw !== null && stageRaw !== '' ? Number(stageRaw) : Number.NaN;
 
   const [caseTitle, setCaseTitle] = useState('');
   const [puzzles, setPuzzles] = useState([]);
+  const [progressRow, setProgressRow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [answerText, setAnswerText] = useState('');
   const [showResult, setShowResult] = useState(false);
@@ -39,12 +67,16 @@ export default function PuzzleGame() {
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
-    Promise.all([getCase(caseId), listPuzzles(caseId)])
-      .then(([c, pz]) => {
+    Promise.all([
+      getCase(caseId),
+      listPuzzles(caseId),
+      getProgress(caseId).catch(() => null),
+    ])
+      .then(([c, pz, prog]) => {
         if (cancelled) return;
         setCaseTitle(c?.title || '');
-        const list = [...(pz?.puzzles || [])].sort((a, b) => a.order - b.order);
-        setPuzzles(list);
+        setPuzzles(sortPuzzlesByOrder(pz?.puzzles || []));
+        setProgressRow(prog && prog.case_id ? prog : null);
       })
       .catch((e) => {
         toast.error(e instanceof Error ? e.message : 'Gagal memuat puzzle');
@@ -57,23 +89,51 @@ export default function PuzzleGame() {
     };
   }, [caseId]);
 
-  const puzzle = useMemo(() => {
-    if (!puzzles.length) return null;
-    const byOrder = puzzles.find((p) => p.order === currentStage);
-    if (byOrder) return byOrder;
-    return puzzles[currentStage - 1] || puzzles[0];
-  }, [puzzles, currentStage]);
+  const sortedPuzzles = useMemo(() => sortPuzzlesByOrder(puzzles), [puzzles]);
+  const firstOrder = getFirstPuzzleOrder(sortedPuzzles);
+  const effectiveStage = Number.isFinite(parsedStage) ? parsedStage : firstOrder;
 
-  const totalStages = puzzles.length;
-  const stageIndex = puzzle ? puzzles.indexOf(puzzle) + 1 : 1;
+  useEffect(() => {
+    if (!caseId || !sortedPuzzles.length || loading) return;
+
+    if (progressRow && !progressRow.is_completed) {
+      const expected = Number(progressRow.current_puzzle);
+      if (Number.isFinite(expected) && parsedStage !== expected) {
+        navigate(`/puzzle/${caseId}?stage=${expected}`, { replace: true });
+      }
+      return;
+    }
+
+    if (!Number.isFinite(parsedStage) && Number.isFinite(firstOrder)) {
+      navigate(`/puzzle/${caseId}?stage=${firstOrder}`, { replace: true });
+    }
+  }, [
+    caseId,
+    sortedPuzzles.length,
+    loading,
+    progressRow,
+    parsedStage,
+    firstOrder,
+    navigate,
+  ]);
+
+  const puzzle = useMemo(
+    () => findPuzzleByStage(sortedPuzzles, effectiveStage),
+    [sortedPuzzles, effectiveStage],
+  );
+
+  const puzzleType =
+    puzzle?.puzzle_meta?.puzzleType || 'Multiple Choice';
+
+  const totalStages = sortedPuzzles.length;
+  const stageIndex = puzzle ? sortedPuzzles.indexOf(puzzle) + 1 : 1;
 
   useEffect(() => {
     setAnswerText('');
     setShowResult(false);
     setLastResult(null);
     setShowAiHint(false);
-  }, [currentStage, puzzle?.id]);
-
+  }, [effectiveStage, puzzle?.id]);
 
   async function handleSubmit() {
     if (!puzzle?.id || !answerText.trim()) return;
@@ -93,9 +153,7 @@ export default function PuzzleGame() {
 
   if (loading) {
     return (
-      <div className='min-h-screen flex items-center justify-center bg-linear-to-br from-purple-50 via-blue-50 to-pink-50'>
-        <p className='text-gray-600'>Memuat puzzle…</p>
-      </div>
+      <CaseFlowPageSkeleton shellClassName='min-h-screen bg-linear-to-br from-purple-50 via-blue-50 to-pink-50' />
     );
   }
 
@@ -115,7 +173,7 @@ export default function PuzzleGame() {
       ? `/puzzle/${caseId}?stage=${lastResult.next_puzzle}`
       : isCorrect
         ? `/case/${caseId}/board`
-        : `/puzzle/${caseId}?stage=${currentStage}`;
+        : `/puzzle/${caseId}?stage=${effectiveStage}`;
 
   const nextLabel =
     isCorrect && lastResult?.next_puzzle != null
@@ -160,7 +218,10 @@ export default function PuzzleGame() {
                 <div className='flex items-center gap-3 mb-2'>
                   <span className='text-sm text-gray-500'>Case</span>
                   <span className='px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-semibold'>
-                    Stage {stageIndex}/{totalStages || 1}
+                    Tahap {stageIndex}/{totalStages || 1}
+                  </span>
+                  <span className='rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600'>
+                    {puzzleType}
                   </span>
                 </div>
                 <h1 className='text-2xl sm:text-3xl font-bold text-gray-900'>{caseTitle || `Case ${caseId}`}</h1>
@@ -179,7 +240,7 @@ export default function PuzzleGame() {
 
             <div className='flex items-center gap-2 text-sm'>
               <Sparkles className='w-4 h-4 text-yellow-500' />
-              <span className='text-gray-600'>Jawaban: teks bebas (case-insensitive)</span>
+              <span className='text-gray-600'>{answerHintForType(puzzleType)}</span>
             </div>
           </CardContent>
         </Card>
@@ -193,7 +254,8 @@ export default function PuzzleGame() {
               <div>
                 <h3 className='font-bold text-gray-900 mb-2'>Detective Note</h3>
                 <p className='text-gray-700 leading-relaxed'>
-                  Kirim jawaban yang sama dengan kunci di server. Petunjuk opsional ada di bawah jika guru mengisi explanation.
+                  Tampilan soal mengikuti tipe yang dipilih guru di Case Builder. Petunjuk tambahan ada di explanation
+                  jika diisi.
                 </p>
               </div>
             </div>
@@ -212,12 +274,15 @@ export default function PuzzleGame() {
 
             {!showResult ? (
               <div className='space-y-4 mb-8'>
-                <Input
-                  value={answerText}
-                  onChange={(e) => setAnswerText(e.target.value)}
-                  placeholder='Tulis jawaban Anda…'
-                  className='text-lg h-12'
-                  onKeyDown={(e) => e.key === 'Enter' && !submitLoading && handleSubmit()}
+                <StudentPuzzleResponse
+                  puzzleId={puzzle.id}
+                  puzzleMeta={puzzle.puzzle_meta}
+                  answerText={answerText}
+                  onAnswerChange={setAnswerText}
+                  disabled={submitLoading}
+                  onSubmitAttempt={() => {
+                    if (!submitLoading) handleSubmit();
+                  }}
                 />
               </div>
             ) : null}

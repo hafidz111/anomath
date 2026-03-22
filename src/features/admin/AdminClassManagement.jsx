@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AsidePanelSkeleton,
+  StatCardsRowSkeleton,
+  TableSkeletonRows,
+} from '@/components/common/page-skeletons';
+import {
   Eye,
   GraduationCap,
-  Loader2,
   Pencil,
   Plus,
   Search,
@@ -27,6 +31,7 @@ import {
   fetchAdminUsers,
   updateAdminClass,
 } from '@/lib/api/admin';
+import { CaseProgressResetPanel } from '@/features/teacher/case-progress-reset-panel';
 
 export default function AdminClassManagement() {
   const [rows, setRows] = useState([]);
@@ -36,6 +41,7 @@ export default function AdminClassManagement() {
   const [pendingOnly, setPendingOnly] = useState(false);
   const [loadError, setLoadError] = useState(null);
 
+  const [listLoading, setListLoading] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState('detail');
   const [panelLoading, setPanelLoading] = useState(false);
@@ -67,7 +73,15 @@ export default function AdminClassManagement() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    let cancelled = false;
+    refresh()
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setListLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
   const filteredRows = useMemo(() => {
@@ -170,21 +184,25 @@ export default function AdminClassManagement() {
       <main className='mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8'>
         {loadError ? <p className='text-sm text-red-600'>{loadError}</p> : null}
 
-        <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
-          {[
-            { label: 'Total Classes', value: summary.total },
-            { label: 'Total Students', value: summary.students },
-            { label: 'Attached Cases', value: summary.cases },
-            { label: 'Attached Puzzles', value: summary.puzzles },
-          ].map((s) => (
-            <Card key={s.label} className='rounded-2xl border bg-linear-to-br from-purple-50 to-blue-50'>
-              <CardContent className='p-5'>
-                <div className='text-2xl font-bold text-gray-900'>{s.value}</div>
-                <p className='text-xs text-gray-600'>{s.label}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {listLoading ? (
+          <StatCardsRowSkeleton count={4} />
+        ) : (
+          <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+            {[
+              { label: 'Total Classes', value: summary.total },
+              { label: 'Total Students', value: summary.students },
+              { label: 'Attached Cases', value: summary.cases },
+              { label: 'Attached Puzzles', value: summary.puzzles },
+            ].map((s) => (
+              <Card key={s.label} className='rounded-2xl border bg-linear-to-br from-purple-50 to-blue-50'>
+                <CardContent className='p-5'>
+                  <div className='text-2xl font-bold text-gray-900'>{s.value}</div>
+                  <p className='text-xs text-gray-600'>{s.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         <Card>
           <CardContent className='space-y-4 p-4'>
@@ -230,7 +248,10 @@ export default function AdminClassManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.map((r) => (
+                {listLoading ? (
+                  <TableSkeletonRows rows={8} columns={8} />
+                ) : null}
+                {!listLoading ? filteredRows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>
                       <div className='inline-flex items-center gap-2'>
@@ -268,7 +289,7 @@ export default function AdminClassManagement() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )) : null}
               </TableBody>
             </Table>
           </CardContent>
@@ -286,9 +307,7 @@ export default function AdminClassManagement() {
               <Button variant='ghost' size='icon' onClick={() => setPanelOpen(false)}><X className='h-4 w-4' /></Button>
             </div>
 
-            {panelLoading ? (
-              <div className='py-10 text-center text-gray-600'><Loader2 className='mx-auto h-6 w-6 animate-spin' /></div>
-            ) : null}
+            {panelLoading ? <AsidePanelSkeleton fields={8} /> : null}
 
             {!panelLoading && panelMode === 'detail' && selected ? (
               <div className='space-y-4'>
@@ -331,6 +350,12 @@ export default function AdminClassManagement() {
                     {(!selected.cases || selected.cases.length === 0) ? <p className='text-sm text-gray-500'>No case attached.</p> : null}
                   </div>
                 </div>
+                <CaseProgressResetPanel
+                  cases={selected.cases || []}
+                  students={selected.students || []}
+                  classroomId={String(selected.id)}
+                  onSuccess={() => void openDetail(selected.id, 'detail')}
+                />
                 <Button onClick={() => setPanelMode('edit')} className='w-full'>Edit</Button>
               </div>
             ) : null}
