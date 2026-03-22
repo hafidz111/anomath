@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { register as apiRegister, saveAuthSession } from '@/lib/api/auth';
 
 export default function RegisterPage() {
-  const [role, setRole] = useState('student');
+  const [role, setRole] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
@@ -26,6 +26,10 @@ export default function RegisterPage() {
     const confirmPassword = String(fd.get('confirmPassword') || '');
     if (password !== confirmPassword) {
       toast.error('Password dan konfirmasi password tidak sama.');
+      return;
+    }
+    if (!role || !['student', 'teacher'].includes(role)) {
+      toast.error('Pilih peran (Student atau Teacher).');
       return;
     }
     const loadingId = toast.loading('Mendaftarkan akun…');
@@ -117,9 +121,9 @@ export default function RegisterPage() {
                   <Input
                     id='fullName'
                     name='fullName'
-                    placeholder='Your name'
+                    placeholder='Masukkan nama lengkap Anda'
                     required
-                    className='h-11'
+                    className='pr-4 h-11 bg-gray-50'
                   />
                 </div>
 
@@ -137,9 +141,8 @@ export default function RegisterPage() {
                       id='email'
                       name='email'
                       type='email'
-                      placeholder='your@email.com'
+                      placeholder='Masukkan email Anda'
                       required
-                      defaultValue='demo@mathdetective.com'
                       className='pl-11 pr-4 h-11 bg-gray-50'
                     />
                   </div>
@@ -159,9 +162,8 @@ export default function RegisterPage() {
                       id='password'
                       name='password'
                       type={showPassword ? 'text' : 'password'}
-                      placeholder='••••••••'
+                      placeholder='Masukkan password Anda'
                       required
-                      defaultValue='password'
                       className='pl-11 pr-12 h-11 bg-gray-50'
                     />
                     <button
@@ -189,15 +191,32 @@ export default function RegisterPage() {
                   >
                     Confirm Password
                   </Label>
-                  <Input
-                    id='confirmPassword'
-                    name='confirmPassword'
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder='••••••••'
-                    required
-                    defaultValue='password'
-                    className='h-11 bg-gray-50'
-                  />
+                  <div className='relative'>
+                    <Lock className='absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400' />
+
+                    <Input
+                      id='confirmPassword'
+                      name='confirmPassword'
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder='Masukkan ulang password Anda'
+                      required
+                      className='pl-11 pr-12 h-11 bg-gray-50'
+                    />
+                    <button
+                      type='button'
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className='absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors'
+                      aria-label={
+                        showPassword ? 'Hide password' : 'Show password'
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff className='w-5 h-5' />
+                      ) : (
+                        <Eye className='w-5 h-5' />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <Button
@@ -205,7 +224,11 @@ export default function RegisterPage() {
                   variant='ghost'
                   className='w-full py-4 bg-linear-to-r from-purple-300 to-blue-300 text-purple-700 rounded-xl font-bold text-lg hover:bg-transparent hover:text-purple-700 hover:shadow-xl transition-all transform hover:-translate-y-0.5'
                 >
-                  Create Account as {role === 'student' ? 'Student' : 'Teacher'}
+                  {role === 'student'
+                    ? 'Create Account as Student'
+                    : role === 'teacher'
+                      ? 'Create Account as Teacher'
+                      : 'Create Account'}
                 </Button>
 
                 <div className='mt-2 text-center'>

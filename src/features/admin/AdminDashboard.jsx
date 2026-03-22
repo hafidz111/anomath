@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Activity, Target, Trophy, Users, Zap } from 'lucide-react';
 
+import { StatCardsRowSkeleton } from '@/components/common/page-skeletons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { fetchAdminStats } from '@/lib/api/admin';
 
 const statTheme = {
@@ -69,6 +71,8 @@ export default function AdminDashboard() {
       }
     : null;
 
+  const showStatsSkeleton = stats == null && loadError == null;
+
   const analyticsCards = stats
     ? [
         {
@@ -105,12 +109,12 @@ export default function AdminDashboard() {
   const systemStatus = [
     {
       label: 'API stats',
-      value: loadError ? 'Error' : stats ? 'Loaded' : 'Loading…',
+      value: loadError ? 'Error' : stats ? 'Loaded' : '__sk__',
       color: loadError ? 'yellow' : 'green',
     },
     {
       label: 'Total cases (incl. archived)',
-      value: stats ? String(stats.total_cases_all) : '—',
+      value: stats ? String(stats.total_cases_all) : '__sk__',
       color: 'green',
     },
     { label: 'Database', value: 'SQLite', color: 'green' },
@@ -126,89 +130,108 @@ export default function AdminDashboard() {
           </p>
         ) : null}
         {/* Summary Cards */}
-        <div className='grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
-          {[
-            {
-              label: 'Total Users',
-              value: platformStats ? formatNum(platformStats.totalUsers) : '…',
-              icon: Users,
-              color: 'purple',
-            },
-            {
-              label: 'Total Teachers',
-              value: platformStats
-                ? formatNum(platformStats.totalTeachers)
-                : '…',
-              icon: Users,
-              color: 'blue',
-            },
-            {
-              label: 'Total Cases',
-              value: platformStats ? formatNum(platformStats.totalCases) : '…',
-              icon: Target,
-              color: 'pink',
-            },
-            {
-              label: 'Total Puzzles',
-              value: platformStats
-                ? formatNum(platformStats.totalPuzzles)
-                : '…',
-              icon: Trophy,
-              color: 'yellow',
-            },
-          ].map((s) => {
-            const theme = statTheme[s.color];
-            const Icon = s.icon;
-            return (
-              <Card
-                key={s.label}
-                className={`rounded-2xl border ${theme.border} shadow-sm ${theme.card}`}
-              >
-                <CardContent className='p-6'>
-                  <div className='w-12 h-12 rounded-xl bg-white/70 flex items-center justify-center shadow-sm'>
-                    <Icon className={`w-6 h-6 ${theme.icon}`} />
-                  </div>
-                  <div className='text-3xl font-bold text-gray-900 mt-3 mb-1'>
-                    {s.value}
-                  </div>
-                  <div className='text-sm text-gray-700'>{s.label}</div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        {showStatsSkeleton ? (
+          <div className='mb-8'>
+            <StatCardsRowSkeleton count={4} />
+          </div>
+        ) : (
+          <div className='mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4'>
+            {[
+              {
+                label: 'Total Users',
+                value: platformStats ? formatNum(platformStats.totalUsers) : '—',
+                icon: Users,
+                color: 'purple',
+              },
+              {
+                label: 'Total Teachers',
+                value: platformStats
+                  ? formatNum(platformStats.totalTeachers)
+                  : '—',
+                icon: Users,
+                color: 'blue',
+              },
+              {
+                label: 'Total Cases',
+                value: platformStats ? formatNum(platformStats.totalCases) : '—',
+                icon: Target,
+                color: 'pink',
+              },
+              {
+                label: 'Total Puzzles',
+                value: platformStats
+                  ? formatNum(platformStats.totalPuzzles)
+                  : '—',
+                icon: Trophy,
+                color: 'yellow',
+              },
+            ].map((s) => {
+              const theme = statTheme[s.color];
+              const Icon = s.icon;
+              return (
+                <Card
+                  key={s.label}
+                  className={`rounded-2xl border ${theme.border} shadow-sm ${theme.card}`}
+                >
+                  <CardContent className='p-6'>
+                    <div className='flex h-12 w-12 items-center justify-center rounded-xl bg-white/70 shadow-sm'>
+                      <Icon className={`h-6 w-6 ${theme.icon}`} />
+                    </div>
+                    <div className='mt-3 mb-1 text-3xl font-bold text-gray-900'>
+                      {s.value}
+                    </div>
+                    <div className='text-sm text-gray-700'>{s.label}</div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {/* Analytics + System Health */}
         <div className='grid lg:grid-cols-3 gap-8'>
           <div className='lg:col-span-2'>
-            <div className='grid sm:grid-cols-2 gap-4'>
-              {analyticsCards.map((c) => {
-                const theme = statTheme[c.color];
-                const Icon = c.icon;
-                return (
-                  <Card
-                    key={c.label}
-                    className='rounded-2xl border border-gray-200 shadow-sm'
-                  >
-                    <CardContent className='p-6'>
-                      <div className='flex items-center justify-between mb-3'>
-                        <div
-                          className={`w-10 h-10 rounded-lg ${theme.card} border ${theme.border} flex items-center justify-center`}
-                        >
-                          <Icon className={`w-5 h-5 ${theme.icon}`} />
+            <div className='grid gap-4 sm:grid-cols-2'>
+              {showStatsSkeleton
+                ? Array.from({ length: 4 }, (_, i) => (
+                    <Card key={i} className='rounded-2xl border border-gray-200 shadow-sm'>
+                      <CardContent className='space-y-3 p-6'>
+                        <div className='flex items-center justify-between'>
+                          <Skeleton className='h-10 w-10 rounded-lg' />
+                          <Skeleton className='h-4 w-10' />
                         </div>
-                        <span className='text-xs font-bold text-green-600'>
-                          {c.change}
-                        </span>
-                      </div>
-                      <div className='text-2xl font-bold text-gray-900 mb-1'>
-                        {c.value}
-                      </div>
-                      <div className='text-sm text-gray-600'>{c.label}</div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                        <Skeleton className='h-8 w-28' />
+                        <Skeleton className='h-4 w-40' />
+                      </CardContent>
+                    </Card>
+                  ))
+                : analyticsCards.map((c) => {
+                    const theme = statTheme[c.color];
+                    const Icon = c.icon;
+                    return (
+                      <Card
+                        key={c.label}
+                        className='rounded-2xl border border-gray-200 shadow-sm'
+                      >
+                        <CardContent className='p-6'>
+                          <div className='mb-3 flex items-center justify-between'>
+                            <div
+                              className={`flex h-10 w-10 items-center justify-center rounded-lg border ${theme.card} ${theme.border}`}
+                            >
+                              <Icon className={`h-5 w-5 ${theme.icon}`} />
+                            </div>
+                            <span className='text-xs font-bold text-green-600'>
+                              {c.change}
+                            </span>
+                          </div>
+                          <div className='mb-1 text-2xl font-bold text-gray-900'>
+                            {c.value}
+                          </div>
+                          <div className='text-sm text-gray-600'>{c.label}</div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
             </div>
           </div>
 
@@ -228,7 +251,11 @@ export default function AdminDashboard() {
                       <span
                         className={`text-sm font-bold ${statTheme[s.color]?.icon ?? 'text-green-600'}`}
                       >
-                        {s.value}
+                        {showStatsSkeleton && s.value === '__sk__' ? (
+                          <Skeleton className='inline-block h-4 w-14' />
+                        ) : (
+                          s.value
+                        )}
                       </span>
                     </div>
                   ))}

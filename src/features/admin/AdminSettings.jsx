@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,7 +52,7 @@ export default function AdminSettings() {
     JSON.stringify(DEFAULT_SETTINGS),
   );
   const [settingsLoading, setSettingsLoading] = useState(true);
-  const [setSnapshot] = useState(null);
+  const [, setSnapshot] = useState(null);
 
   const dirty = useMemo(
     () => JSON.stringify(settings) !== baselineJson,
@@ -148,7 +149,7 @@ export default function AdminSettings() {
                 User Settings
               </h2>
               {settingsLoading ? (
-                <p className='text-sm text-gray-500'>Memuat pengaturan…</p>
+                <Skeleton className='mt-1 h-4 w-72 max-w-full' />
               ) : (
                 <p className='text-sm text-gray-500'>
                   Disimpan di server (GET/PATCH /api/admin/settings/).
@@ -157,59 +158,84 @@ export default function AdminSettings() {
             </div>
           </div>
 
-          <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
-            <div>
-              <p className='font-semibold text-gray-900'>
-                Allow Teacher Case Creation
-              </p>
-              <p className='text-sm text-gray-600'>
-                Teachers can create custom detective cases
-              </p>
-            </div>
-            <input
-              type='checkbox'
-              className='h-5 w-5'
-              checked={settings.allowTeacherCases}
-              onChange={() =>
-                update({ allowTeacherCases: !settings.allowTeacherCases })
-              }
-            />
-          </div>
+          {settingsLoading ? (
+            <>
+              <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
+                <div className='min-w-0 flex-1 space-y-2 pr-4'>
+                  <Skeleton className='h-4 w-48' />
+                  <Skeleton className='h-3 w-full max-w-md' />
+                </div>
+                <Skeleton className='h-5 w-5 shrink-0 rounded-md' />
+              </div>
+              <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
+                <div className='min-w-0 flex-1 space-y-2 pr-4'>
+                  <Skeleton className='h-4 w-52' />
+                  <Skeleton className='h-3 w-full max-w-sm' />
+                </div>
+                <Skeleton className='h-5 w-5 shrink-0 rounded-md' />
+              </div>
+              <div className='space-y-2'>
+                <Skeleton className='h-4 w-36' />
+                <Skeleton className='h-10 w-full rounded-md' />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
+                <div>
+                  <p className='font-semibold text-gray-900'>
+                    Allow Teacher Case Creation
+                  </p>
+                  <p className='text-sm text-gray-600'>
+                    Teachers can create custom detective cases
+                  </p>
+                </div>
+                <input
+                  type='checkbox'
+                  className='h-5 w-5'
+                  checked={settings.allowTeacherCases}
+                  onChange={() =>
+                    update({ allowTeacherCases: !settings.allowTeacherCases })
+                  }
+                />
+              </div>
 
-          <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
-            <div>
-              <p className='font-semibold text-gray-900'>
-                Enable Group Competition
-              </p>
-              <p className='text-sm text-gray-600'>
-                Students can compete in teams and groups
-              </p>
-            </div>
-            <input
-              type='checkbox'
-              className='h-5 w-5'
-              checked={settings.enableCompetition}
-              onChange={() =>
-                update({ enableCompetition: !settings.enableCompetition })
-              }
-            />
-          </div>
+              <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
+                <div>
+                  <p className='font-semibold text-gray-900'>
+                    Enable Group Competition
+                  </p>
+                  <p className='text-sm text-gray-600'>
+                    Students can compete in teams and groups
+                  </p>
+                </div>
+                <input
+                  type='checkbox'
+                  className='h-5 w-5'
+                  checked={settings.enableCompetition}
+                  onChange={() =>
+                    update({ enableCompetition: !settings.enableCompetition })
+                  }
+                />
+              </div>
 
-          <div className='space-y-2'>
-            <Label>Default User Role</Label>
-            <Select
-              value={settings.defaultRole}
-              onValueChange={(v) => update({ defaultRole: v })}
-            >
-              <SelectTrigger className='w-full bg-gray-50'>
-                <SelectValue placeholder='Select role' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='student'>Student</SelectItem>
-                <SelectItem value='teacher'>Teacher</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className='space-y-2'>
+                <Label>Default User Role</Label>
+                <Select
+                  value={settings.defaultRole}
+                  onValueChange={(v) => update({ defaultRole: v })}
+                >
+                  <SelectTrigger className='w-full bg-gray-50'>
+                    <SelectValue placeholder='Select role' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='student'>Student</SelectItem>
+                    <SelectItem value='teacher'>Teacher</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -225,72 +251,109 @@ export default function AdminSettings() {
           </div>
 
           <div className='grid gap-6 md:grid-cols-2'>
-            <div className='space-y-3 rounded-2xl border border-purple-200 bg-linear-to-br from-purple-100 to-blue-100 p-6'>
-              <h3 className='font-bold text-gray-900'>Free Plan</h3>
-              <div className='space-y-2'>
-                <Label htmlFor='free-max-students'>Max Students</Label>
-                <Input
-                  id='free-max-students'
-                  type='number'
-                  className='bg-white'
-                  value={settings.freeMaxStudents}
-                  onChange={(e) =>
-                    update({ freeMaxStudents: Number(e.target.value) || 0 })
-                  }
-                />
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='free-max-cases'>Max Cases</Label>
-                <Input
-                  id='free-max-cases'
-                  type='number'
-                  className='bg-white'
-                  value={settings.freeMaxCases}
-                  onChange={(e) =>
-                    update({ freeMaxCases: Number(e.target.value) || 0 })
-                  }
-                />
-              </div>
-            </div>
+            {settingsLoading ? (
+              <>
+                <div className='space-y-3 rounded-2xl border border-purple-200 bg-linear-to-br from-purple-100 to-blue-100 p-6'>
+                  <Skeleton className='h-5 w-24' />
+                  <div className='space-y-2'>
+                    <Skeleton className='h-4 w-28' />
+                    <Skeleton className='h-10 w-full rounded-md bg-white/80' />
+                  </div>
+                  <div className='space-y-2'>
+                    <Skeleton className='h-4 w-24' />
+                    <Skeleton className='h-10 w-full rounded-md bg-white/80' />
+                  </div>
+                </div>
+                <div className='space-y-3 rounded-2xl border border-yellow-200 bg-linear-to-br from-yellow-100 to-pink-100 p-6'>
+                  <Skeleton className='h-5 w-32' />
+                  <div className='space-y-2'>
+                    <Skeleton className='h-4 w-36' />
+                    <Skeleton className='h-10 w-full rounded-md bg-white/80' />
+                  </div>
+                  <div className='flex flex-col gap-3 pt-1'>
+                    <div className='flex items-center gap-2'>
+                      <Skeleton className='h-4 w-4 shrink-0 rounded' />
+                      <Skeleton className='h-4 w-36' />
+                    </div>
+                    <div className='flex items-center gap-2'>
+                      <Skeleton className='h-4 w-4 shrink-0 rounded' />
+                      <Skeleton className='h-4 w-28' />
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className='space-y-3 rounded-2xl border border-purple-200 bg-linear-to-br from-purple-100 to-blue-100 p-6'>
+                  <h3 className='font-bold text-gray-900'>Free Plan</h3>
+                  <div className='space-y-2'>
+                    <Label htmlFor='free-max-students'>Max Students</Label>
+                    <Input
+                      id='free-max-students'
+                      type='number'
+                      className='bg-white'
+                      value={settings.freeMaxStudents}
+                      onChange={(e) =>
+                        update({ freeMaxStudents: Number(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label htmlFor='free-max-cases'>Max Cases</Label>
+                    <Input
+                      id='free-max-cases'
+                      type='number'
+                      className='bg-white'
+                      value={settings.freeMaxCases}
+                      onChange={(e) =>
+                        update({ freeMaxCases: Number(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                </div>
 
-            <div className='space-y-3 rounded-2xl border border-yellow-200 bg-linear-to-br from-yellow-100 to-pink-100 p-6'>
-              <h3 className='font-bold text-gray-900'>Premium Plan</h3>
-              <div className='space-y-2'>
-                <Label htmlFor='premium-price'>Monthly Price ($)</Label>
-                <Input
-                  id='premium-price'
-                  type='number'
-                  className='bg-white'
-                  value={settings.premiumPrice}
-                  onChange={(e) =>
-                    update({ premiumPrice: Number(e.target.value) || 0 })
-                  }
-                />
-              </div>
-              <label className='flex items-center gap-2 text-sm text-gray-700'>
-                <input
-                  type='checkbox'
-                  checked={settings.premiumUnlimitedStudents}
-                  onChange={() =>
-                    update({
-                      premiumUnlimitedStudents:
-                        !settings.premiumUnlimitedStudents,
-                    })
-                  }
-                />
-                <span>Unlimited Students</span>
-              </label>
-              <label className='flex items-center gap-2 text-sm text-gray-700'>
-                <input
-                  type='checkbox'
-                  checked={settings.premiumCustomCases}
-                  onChange={() =>
-                    update({ premiumCustomCases: !settings.premiumCustomCases })
-                  }
-                />
-                <span>Custom Cases</span>
-              </label>
-            </div>
+                <div className='space-y-3 rounded-2xl border border-yellow-200 bg-linear-to-br from-yellow-100 to-pink-100 p-6'>
+                  <h3 className='font-bold text-gray-900'>Premium Plan</h3>
+                  <div className='space-y-2'>
+                    <Label htmlFor='premium-price'>Monthly Price ($)</Label>
+                    <Input
+                      id='premium-price'
+                      type='number'
+                      className='bg-white'
+                      value={settings.premiumPrice}
+                      onChange={(e) =>
+                        update({ premiumPrice: Number(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                  <label className='flex items-center gap-2 text-sm text-gray-700'>
+                    <input
+                      type='checkbox'
+                      checked={settings.premiumUnlimitedStudents}
+                      onChange={() =>
+                        update({
+                          premiumUnlimitedStudents:
+                            !settings.premiumUnlimitedStudents,
+                        })
+                      }
+                    />
+                    <span>Unlimited Students</span>
+                  </label>
+                  <label className='flex items-center gap-2 text-sm text-gray-700'>
+                    <input
+                      type='checkbox'
+                      checked={settings.premiumCustomCases}
+                      onChange={() =>
+                        update({
+                          premiumCustomCases: !settings.premiumCustomCases,
+                        })
+                      }
+                    />
+                    <span>Custom Cases</span>
+                  </label>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -306,95 +369,131 @@ export default function AdminSettings() {
             </h2>
           </div>
 
-          <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
-            <div className='inline-flex items-center gap-2'>
-              <Bell className='h-5 w-5 text-purple-600' />
-              <div>
-                <p className='font-semibold text-gray-900'>
-                  Email Notifications
-                </p>
-                <p className='text-sm text-gray-600'>
-                  Send email updates to users
-                </p>
+          {settingsLoading ? (
+            <>
+              <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
+                <div className='inline-flex min-w-0 flex-1 items-center gap-2 pr-4'>
+                  <Skeleton className='h-5 w-5 shrink-0 rounded-md' />
+                  <div className='min-w-0 flex-1 space-y-2'>
+                    <Skeleton className='h-4 w-40' />
+                    <Skeleton className='h-3 w-full max-w-xs' />
+                  </div>
+                </div>
+                <Skeleton className='h-5 w-5 shrink-0 rounded-md' />
               </div>
-            </div>
-            <input
-              type='checkbox'
-              className='h-5 w-5'
-              checked={settings.emailNotifications}
-              onChange={() =>
-                update({ emailNotifications: !settings.emailNotifications })
-              }
-            />
-          </div>
+              <div className='space-y-2'>
+                <Skeleton className='h-4 w-48' />
+                <Skeleton className='h-10 w-full max-w-md rounded-md' />
+              </div>
+              <div className='space-y-2'>
+                <Skeleton className='h-4 w-44' />
+                <div className='space-y-3 rounded-xl bg-gray-50 p-4'>
+                  <Skeleton className='h-4 w-40' />
+                  <Skeleton className='h-4 w-48' />
+                  <Skeleton className='h-4 w-32' />
+                  <Skeleton className='h-4 w-44' />
+                </div>
+              </div>
+              <div className='space-y-2'>
+                <Skeleton className='h-4 w-36' />
+                <Skeleton className='h-10 w-full rounded-md' />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className='flex items-center justify-between rounded-xl bg-gray-50 p-4'>
+                <div className='inline-flex items-center gap-2'>
+                  <Bell className='h-5 w-5 text-purple-600' />
+                  <div>
+                    <p className='font-semibold text-gray-900'>
+                      Email Notifications
+                    </p>
+                    <p className='text-sm text-gray-600'>
+                      Send email updates to users
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type='checkbox'
+                  className='h-5 w-5'
+                  checked={settings.emailNotifications}
+                  onChange={() =>
+                    update({ emailNotifications: !settings.emailNotifications })
+                  }
+                />
+              </div>
 
-          <div className='space-y-2'>
-            <Label htmlFor='session-timeout'>Session Timeout (minutes)</Label>
-            <Input
-              id='session-timeout'
-              type='number'
-              className='bg-gray-50'
-              value={settings.sessionTimeout}
-              onChange={(e) =>
-                update({ sessionTimeout: Number(e.target.value) || 0 })
-              }
-            />
-          </div>
+              <div className='space-y-2'>
+                <Label htmlFor='session-timeout'>Session Timeout (minutes)</Label>
+                <Input
+                  id='session-timeout'
+                  type='number'
+                  className='bg-gray-50'
+                  value={settings.sessionTimeout}
+                  onChange={(e) =>
+                    update({ sessionTimeout: Number(e.target.value) || 0 })
+                  }
+                />
+              </div>
 
-          <div className='space-y-2'>
-            <Label>Password Requirements</Label>
-            <div className='space-y-2 rounded-xl bg-gray-50 p-4 text-sm'>
-              <label className='flex items-center gap-2'>
-                <input
-                  type='checkbox'
-                  checked={settings.pwdMin8}
-                  onChange={() => update({ pwdMin8: !settings.pwdMin8 })}
-                />
-                Minimum 8 characters
-              </label>
-              <label className='flex items-center gap-2'>
-                <input
-                  type='checkbox'
-                  checked={settings.pwdUpper}
-                  onChange={() => update({ pwdUpper: !settings.pwdUpper })}
-                />
-                Require uppercase letter
-              </label>
-              <label className='flex items-center gap-2'>
-                <input
-                  type='checkbox'
-                  checked={settings.pwdNumber}
-                  onChange={() => update({ pwdNumber: !settings.pwdNumber })}
-                />
-                Require number
-              </label>
-              <label className='flex items-center gap-2'>
-                <input
-                  type='checkbox'
-                  checked={settings.pwdSpecial}
-                  onChange={() => update({ pwdSpecial: !settings.pwdSpecial })}
-                />
-                Require special character
-              </label>
-            </div>
-          </div>
+              <div className='space-y-2'>
+                <Label>Password Requirements</Label>
+                <div className='space-y-2 rounded-xl bg-gray-50 p-4 text-sm'>
+                  <label className='flex items-center gap-2'>
+                    <input
+                      type='checkbox'
+                      checked={settings.pwdMin8}
+                      onChange={() => update({ pwdMin8: !settings.pwdMin8 })}
+                    />
+                    Minimum 8 characters
+                  </label>
+                  <label className='flex items-center gap-2'>
+                    <input
+                      type='checkbox'
+                      checked={settings.pwdUpper}
+                      onChange={() => update({ pwdUpper: !settings.pwdUpper })}
+                    />
+                    Require uppercase letter
+                  </label>
+                  <label className='flex items-center gap-2'>
+                    <input
+                      type='checkbox'
+                      checked={settings.pwdNumber}
+                      onChange={() => update({ pwdNumber: !settings.pwdNumber })}
+                    />
+                    Require number
+                  </label>
+                  <label className='flex items-center gap-2'>
+                    <input
+                      type='checkbox'
+                      checked={settings.pwdSpecial}
+                      onChange={() =>
+                        update({ pwdSpecial: !settings.pwdSpecial })
+                      }
+                    />
+                    Require special character
+                  </label>
+                </div>
+              </div>
 
-          <div className='space-y-2'>
-            <Label>Backup Frequency</Label>
-            <Select
-              value={settings.backupFrequency}
-              onValueChange={(v) => update({ backupFrequency: v })}
-            >
-              <SelectTrigger className='w-full bg-gray-50'>
-                <SelectValue placeholder='Select backup frequency' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='daily'>Daily</SelectItem>
-                <SelectItem value='weekly'>Weekly</SelectItem>
-                <SelectItem value='monthly'>Monthly</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className='space-y-2'>
+                <Label>Backup Frequency</Label>
+                <Select
+                  value={settings.backupFrequency}
+                  onValueChange={(v) => update({ backupFrequency: v })}
+                >
+                  <SelectTrigger className='w-full bg-gray-50'>
+                    <SelectValue placeholder='Select backup frequency' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='daily'>Daily</SelectItem>
+                    <SelectItem value='weekly'>Weekly</SelectItem>
+                    <SelectItem value='monthly'>Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -403,7 +502,7 @@ export default function AdminSettings() {
           variant='outline'
           type='button'
           onClick={handleCancel}
-          disabled={!dirty}
+          disabled={!dirty || settingsLoading}
         >
           Batal
         </Button>

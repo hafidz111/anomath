@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 
 import { EmptyState } from '@/components/common/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TeacherTopBar } from '@/components/teacher/teacher-top-bar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -152,25 +153,25 @@ export default function TeacherDashboard() {
           {[
             {
               label: 'Total Students',
-              value: loading ? '…' : overview.totalStudents,
+              value: loading ? null : overview.totalStudents,
               icon: Users,
               color: 'purple',
             },
             {
               label: 'Average Score',
-              value: loading ? '…' : `${overview.avgScore}%`,
+              value: loading ? null : `${overview.avgScore}%`,
               icon: Trophy,
               color: 'yellow',
             },
             {
               label: 'My Cases',
-              value: loading ? '…' : myCases.length,
+              value: loading ? null : myCases.length,
               icon: CheckCircle,
               color: 'blue',
             },
             {
               label: 'Total Puzzles',
-              value: loading ? '…' : overview.totalPuzzles,
+              value: loading ? null : overview.totalPuzzles,
               icon: TrendingUp,
               color: 'green',
             },
@@ -182,7 +183,13 @@ export default function TeacherDashboard() {
                   <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm'>
                     <Icon className='h-6 w-6' />
                   </div>
-                  <div className='mb-1 text-3xl font-bold text-gray-900'>{stat.value}</div>
+                  <div className='mb-1 text-3xl font-bold text-gray-900'>
+                    {stat.value == null ? (
+                      <Skeleton className='inline-block h-9 w-16' />
+                    ) : (
+                      stat.value
+                    )}
+                  </div>
                   <div className='text-sm text-gray-600'>{stat.label}</div>
                 </CardContent>
               </Card>
@@ -205,7 +212,11 @@ export default function TeacherDashboard() {
               <h2 className='mb-4 text-2xl font-bold text-gray-900'>My Classes</h2>
               <div className='space-y-3'>
                 {loading ? (
-                  <EmptyState title='…' />
+                  <div className='space-y-3'>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className='h-24 w-full rounded-xl' />
+                    ))}
+                  </div>
                 ) : myClasses.length === 0 ? (
                   <EmptyState title='Tidak ada kelas'>
                     <Button asChild size='sm' variant='outline' className='rounded-full'>
@@ -238,7 +249,11 @@ export default function TeacherDashboard() {
               <h2 className='mb-4 text-2xl font-bold text-gray-900'>My Cases</h2>
               <div className='space-y-3'>
                 {loading ? (
-                  <EmptyState title='…' />
+                  <div className='space-y-3'>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className='h-20 w-full rounded-xl' />
+                    ))}
+                  </div>
                 ) : myCases.length === 0 ? (
                   <EmptyState title='Tidak ada case'>
                     <Button asChild size='sm' variant='outline' className='rounded-full'>
@@ -273,7 +288,11 @@ export default function TeacherDashboard() {
               </div>
               <CardContent className='min-h-[200px] p-6'>
                 {loading ? (
-                  <EmptyState title='…' />
+                  <div className='space-y-3'>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Skeleton key={i} className='h-14 w-full rounded-xl' />
+                    ))}
+                  </div>
                 ) : students.length === 0 ? (
                   <EmptyState title={dashboardError ? 'Gagal memuat' : 'Tidak ada data'} />
                 ) : (
@@ -311,38 +330,42 @@ export default function TeacherDashboard() {
                 <h2 className='text-2xl font-bold text-gray-900 mb-4'>Analytics</h2>
                 <h3 className='text-lg font-semibold text-gray-800 mb-3'>Weekly Progress</h3>
                 <div className='relative min-h-[280px] rounded-2xl border border-gray-200 p-3'>
-                  <ResponsiveContainer width='100%' height={280}>
-                    <LineChart data={weeklyProgress}>
-                      <CartesianGrid strokeDasharray='3 3' stroke='#E5E7EB' />
-                      <XAxis dataKey='week' stroke='#6B7280' />
-                      <YAxis stroke='#6B7280' />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #E5E7EB',
-                          borderRadius: '12px',
-                          padding: '10px',
-                        }}
-                      />
-                      <Legend verticalAlign='bottom' height={36} />
-                      <Line
-                        type='monotone'
-                        dataKey='completed'
-                        stroke='#A78BFA'
-                        strokeWidth={3}
-                        dot={{ fill: '#A78BFA', r: 4 }}
-                        name='Cases Completed'
-                      />
-                      <Line
-                        type='monotone'
-                        dataKey='accuracy'
-                        stroke='#60A5FA'
-                        strokeWidth={3}
-                        dot={{ fill: '#60A5FA', r: 4 }}
-                        name='Accuracy %'
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {loading ? (
+                    <Skeleton className='h-[280px] w-full rounded-xl' />
+                  ) : (
+                    <ResponsiveContainer width='100%' height={280}>
+                      <LineChart data={weeklyProgress}>
+                        <CartesianGrid strokeDasharray='3 3' stroke='#E5E7EB' />
+                        <XAxis dataKey='week' stroke='#6B7280' />
+                        <YAxis stroke='#6B7280' />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '12px',
+                            padding: '10px',
+                          }}
+                        />
+                        <Legend verticalAlign='bottom' height={36} />
+                        <Line
+                          type='monotone'
+                          dataKey='completed'
+                          stroke='#A78BFA'
+                          strokeWidth={3}
+                          dot={{ fill: '#A78BFA', r: 4 }}
+                          name='Cases Completed'
+                        />
+                        <Line
+                          type='monotone'
+                          dataKey='accuracy'
+                          stroke='#60A5FA'
+                          strokeWidth={3}
+                          dot={{ fill: '#60A5FA', r: 4 }}
+                          name='Accuracy %'
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
 
                 <div className='grid sm:grid-cols-3 gap-4 mt-6'>
@@ -350,7 +373,7 @@ export default function TeacherDashboard() {
                     {
                       label: 'Avg Completion Time',
                       value: loading
-                        ? '…'
+                        ? null
                         : analytics?.avg_completion_minutes != null
                           ? `${analytics.avg_completion_minutes} min`
                           : '—',
@@ -361,7 +384,7 @@ export default function TeacherDashboard() {
                     {
                       label: 'Success Rate',
                       value: loading
-                        ? '…'
+                        ? null
                         : hasDashboard
                           ? `${analytics?.success_rate_percent ?? 0}%`
                           : dashboardError
@@ -374,7 +397,7 @@ export default function TeacherDashboard() {
                     {
                       label: 'Active This Week',
                       value: loading
-                        ? '…'
+                        ? null
                         : hasDashboard
                           ? `${analytics?.active_students_this_week ?? 0}/${Math.max(
                               analytics?.total_students_in_classes || 0,
@@ -396,7 +419,13 @@ export default function TeacherDashboard() {
                             <Icon className='w-5 h-5' />
                             <span className='text-sm text-gray-600'>{stat.label}</span>
                           </div>
-                          <div className='text-2xl font-bold text-gray-900'>{stat.value}</div>
+                          <div className='text-2xl font-bold text-gray-900'>
+                            {stat.value == null ? (
+                              <Skeleton className='inline-block h-8 w-24' />
+                            ) : (
+                              stat.value
+                            )}
+                          </div>
                           {stat.hint ? <p className='mt-1 text-xs text-gray-500'>{stat.hint}</p> : null}
                         </CardContent>
                       </Card>
@@ -415,7 +444,11 @@ export default function TeacherDashboard() {
               </div>
               <div className='min-h-[120px] space-y-3'>
                 {loading ? (
-                  <EmptyState title='Memuat leaderboard…' />
+                  <div className='space-y-3'>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className='h-16 w-full rounded-xl' />
+                    ))}
+                  </div>
                 ) : leaderboardRows.length === 0 ? (
                   <EmptyState title='Kosong' />
                 ) : (
@@ -445,21 +478,21 @@ export default function TeacherDashboard() {
                     {
                       label: 'Cases Created',
                       value: loading
-                        ? '…'
+                        ? null
                         : String(quickStats?.cases_created ?? myCases.length),
                       icon: Puzzle,
                     },
                     {
                       label: 'Total Classes',
                       value: loading
-                        ? '…'
+                        ? null
                         : String(quickStats?.total_classes ?? overview.classCount),
                       icon: Users,
                     },
                     {
                       label: 'Avg Class Size',
                       value: loading
-                        ? '…'
+                        ? null
                         : quickStats != null
                           ? String(quickStats.avg_class_size)
                           : overview.classCount > 0
@@ -475,7 +508,13 @@ export default function TeacherDashboard() {
                           <Icon className='w-4 h-4 text-blue-600' />
                           {q.label}
                         </div>
-                        <span className='font-bold text-gray-900'>{q.value}</span>
+                        <span className='font-bold text-gray-900'>
+                          {q.value == null ? (
+                            <Skeleton className='inline-block h-5 w-10' />
+                          ) : (
+                            q.value
+                          )}
+                        </span>
                       </div>
                     );
                   })}

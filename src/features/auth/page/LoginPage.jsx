@@ -16,7 +16,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo =
-    typeof location.state?.from === 'string' && location.state.from.startsWith('/')
+    typeof location.state?.from === 'string' &&
+    location.state.from.startsWith('/')
       ? location.state.from
       : null;
 
@@ -120,8 +121,7 @@ export default function LoginPage() {
                       id='email'
                       name='email'
                       type='email'
-                      placeholder='your@email.com'
-                      defaultValue='demo@mathdetective.com'
+                      placeholder='Masukkan email Anda'
                       className='pl-11 pr-4 py-3.5 h-11 bg-gray-50 border-gray-200 rounded-xl focus-visible:ring-purple-300'
                       required
                     />
@@ -142,8 +142,7 @@ export default function LoginPage() {
                       id='password'
                       name='password'
                       type={showPassword ? 'text' : 'password'}
-                      placeholder='••••••••'
-                      defaultValue='password'
+                      placeholder='Masukkan password Anda'
                       className='pl-11 pr-12 py-3.5 h-11 bg-gray-50 border-gray-200 rounded-xl focus-visible:ring-purple-300'
                       required
                     />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Award, Crown, Medal, Star, Target, Trophy, Users } from 'lucide-react';
 
+import { LeaderboardPageSkeleton } from '@/components/common/page-skeletons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -178,9 +179,8 @@ export default function AdminLeaderboardMonitoring() {
           </p>
         ) : null}
         {loading ? (
-          <p className='text-sm text-gray-600 mb-4'>Memuat leaderboard…</p>
-        ) : null}
-
+          <LeaderboardPageSkeleton />
+        ) : (
         <Tabs defaultValue='global' className='space-y-6'>
           <TabsList className='h-auto p-1'>
             <TabsTrigger value='global' className='px-4 py-2'>
@@ -207,7 +207,7 @@ export default function AdminLeaderboardMonitoring() {
                 <em>Class Leaderboard</em> / <em>Team</em>.
               </CardContent>
             </Card>
-            {globalRows.length === 0 && !loadError && !loading ? (
+            {globalRows.length === 0 && !loadError ? (
               <Card className='rounded-2xl border border-dashed border-gray-200'>
                 <CardContent className='p-8 text-center text-sm text-gray-600'>
                   Belum ada data siswa dengan skor progres. Mainkan case sebagai siswa untuk mengisi leaderboard.
@@ -477,6 +477,7 @@ export default function AdminLeaderboardMonitoring() {
             ) : null}
           </TabsContent>
         </Tabs>
+        )}
       </main>
     </>
   );

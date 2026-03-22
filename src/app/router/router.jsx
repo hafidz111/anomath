@@ -25,12 +25,8 @@ import MaintenancePage from '@/features/system/MaintenancePage';
 import NotFoundPage from '@/features/system/NotFoundPage';
 import UnauthorizedPage from '@/features/system/UnauthorizedPage';
 import ProtectedRoute from '@/app/router/ProtectedRoute';
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-function PuzzleBuilderRoute() {
-  const { search } = useLocation();
-  return <PuzzleBuilder key={search} />;
-}
 
 const maintenanceMode = import.meta.env.VITE_MAINTENANCE === 'true';
 
@@ -51,6 +47,7 @@ export default function AppRouter() {
         <Route path='/' element={<HomePage />} />
         <Route path='/login' element={<LoginPage />} />
         <Route path='/register' element={<RegisterPage />} />
+        <Route path='/maintenance' element={<MaintenancePage />} />
         <Route path='/unauthorized' element={<UnauthorizedPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={['student']} />}>
@@ -68,7 +65,7 @@ export default function AppRouter() {
           <Route path='/teacher/classes' element={<ClassManagement />} />
           <Route path='/teacher/classes/:classCode' element={<TeacherClassDetail />} />
           <Route path='/teacher/case-builder' element={<CaseBuilder />} />
-          <Route path='/teacher/puzzle-builder' element={<PuzzleBuilderRoute />} />
+          <Route path='/teacher/puzzle-builder' element={<PuzzleBuilder />} />
           <Route path='/teacher/performance' element={<StudentPerformance />} />
         </Route>
 

@@ -5,6 +5,12 @@
 
 import { apiUrl } from './config';
 import { apiFetch } from './client';
+import {
+  redirectToServerMaintenancePage,
+  redirectToServerUnreachable,
+} from '@/lib/maintenance-redirect';
+
+export { saveAuthSession, clearAuthSession } from '@/lib/auth/session';
 
 function parseErrorMessage(payload) {
   if (!payload || typeof payload !== 'object') return 'Request failed';
@@ -17,6 +23,10 @@ function parseErrorMessage(payload) {
 }
 
 async function parseResponse(res) {
+  if (res.status >= 500 && res.status < 600) {
+    redirectToServerMaintenancePage(res.status);
+    throw new Error('Server sedang bermasalah. Silakan coba lagi nanti.');
+  }
   const text = await res.text();
   if (!text) {
     if (res.status === 502 || res.status === 503) {
@@ -37,26 +47,6 @@ async function parseResponse(res) {
   }
 }
 
-export function saveAuthSession(data) {
-  if (!data) return;
-  if (data.access) localStorage.setItem('anomath_access', data.access);
-  if (data.refresh) localStorage.setItem('anomath_refresh', data.refresh);
-  if (data.user) {
-    const roleNorm = String(data.user.role ?? '')
-      .toLowerCase()
-      .trim();
-    if (roleNorm) localStorage.setItem('anomath_role', roleNorm);
-    localStorage.setItem('anomath_user', JSON.stringify(data.user));
-  }
-}
-
-export function clearAuthSession() {
-  localStorage.removeItem('anomath_access');
-  localStorage.removeItem('anomath_refresh');
-  localStorage.removeItem('anomath_user');
-  localStorage.removeItem('anomath_role');
-}
-
 /**
  * POST /api/auth/login/
  * @returns {Promise<{ access: string, refresh: string, user: object }>}
@@ -65,9 +55,8 @@ async function safeFetch(url, options) {
   try {
     return await fetch(url, options);
   } catch {
-    throw new Error(
-      'Tidak bisa terhubung ke API. Jalankan backend: cd anomath-backend && python manage.py runserver (port 8000), lalu restart npm run dev jika baru mengubah .env.'
-    );
+    redirectToServerUnreachable();
+    throw new Error('Tidak bisa terhubung ke server.');
   }
 }
 

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AsidePanelSkeleton,
+  StatCardsRowSkeleton,
+  TableSkeletonRows,
+} from '@/components/common/page-skeletons';
+import {
   Ban,
   CheckCircle,
   Eye,
@@ -42,6 +47,7 @@ function mapRow(u) {
 
 export default function AdminUserManagement() {
   const [userList, setUserList] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -62,7 +68,7 @@ export default function AdminUserManagement() {
   const [editPassword, setEditPassword] = useState('');
 
   const refreshList = useCallback(() => {
-    fetchAdminUsers({ page_size: 500 })
+    return fetchAdminUsers({ page_size: 500 })
       .then((data) => {
         if (!data?.users) return;
         setUserList(data.users.map(mapRow));
@@ -74,7 +80,13 @@ export default function AdminUserManagement() {
   }, []);
 
   useEffect(() => {
-    refreshList();
+    let cancelled = false;
+    refreshList().finally(() => {
+      if (!cancelled) setListLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [refreshList]);
 
   const openPanel = async (userId, mode) => {
@@ -211,25 +223,29 @@ export default function AdminUserManagement() {
             {loadError}
           </p>
         ) : null}
-        <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
-          {[
-            { label: 'Total Users', value: summary.total, icon: Users, cardClass: 'from-purple-100 to-purple-50 border-purple-200 text-purple-600' },
-            { label: 'Students', value: summary.students, icon: Users, cardClass: 'from-blue-100 to-blue-50 border-blue-200 text-blue-600' },
-            { label: 'Teachers', value: summary.teachers, icon: Users, cardClass: 'from-pink-100 to-pink-50 border-pink-200 text-pink-600' },
-            { label: 'Active', value: summary.active, icon: CheckCircle, cardClass: 'from-green-100 to-green-50 border-green-200 text-green-600' },
-          ].map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={stat.label} className={`rounded-2xl border bg-linear-to-br ${stat.cardClass}`}>
-                <CardContent className='p-5'>
-                  <Icon className='mb-2 h-5 w-5' />
-                  <div className='text-2xl font-bold text-gray-900'>{stat.value}</div>
-                  <p className='text-xs text-gray-600'>{stat.label}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        {listLoading ? (
+          <StatCardsRowSkeleton count={4} />
+        ) : (
+          <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+            {[
+              { label: 'Total Users', value: summary.total, icon: Users, cardClass: 'from-purple-100 to-purple-50 border-purple-200 text-purple-600' },
+              { label: 'Students', value: summary.students, icon: Users, cardClass: 'from-blue-100 to-blue-50 border-blue-200 text-blue-600' },
+              { label: 'Teachers', value: summary.teachers, icon: Users, cardClass: 'from-pink-100 to-pink-50 border-pink-200 text-pink-600' },
+              { label: 'Active', value: summary.active, icon: CheckCircle, cardClass: 'from-green-100 to-green-50 border-green-200 text-green-600' },
+            ].map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <Card key={stat.label} className={`rounded-2xl border bg-linear-to-br ${stat.cardClass}`}>
+                  <CardContent className='p-5'>
+                    <Icon className='mb-2 h-5 w-5' />
+                    <div className='text-2xl font-bold text-gray-900'>{stat.value}</div>
+                    <p className='text-xs text-gray-600'>{stat.label}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         <Card>
           <CardContent className='space-y-4 p-4'>
@@ -289,7 +305,8 @@ export default function AdminUserManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((u) => (
+                {listLoading ? <TableSkeletonRows rows={8} columns={6} /> : null}
+                {!listLoading ? filteredUsers.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell>
                       <div className='inline-flex items-center gap-2'>
@@ -376,8 +393,8 @@ export default function AdminUserManagement() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-                {filteredUsers.length === 0 ? (
+                )) : null}
+                {!listLoading && filteredUsers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className='py-6 text-center text-sm text-gray-500'>
                       {loadError ? 'Tidak dapat memuat data.' : 'No users found with current filters.'}
@@ -414,12 +431,7 @@ export default function AdminUserManagement() {
             </div>
 
             <div className='min-h-0 flex-1 overflow-y-auto px-4 py-4'>
-              {panelLoading ? (
-                <div className='flex items-center justify-center gap-2 py-12 text-gray-600'>
-                  <Loader2 className='h-6 w-6 animate-spin' />
-                  Memuat…
-                </div>
-              ) : null}
+              {panelLoading ? <AsidePanelSkeleton fields={7} /> : null}
               {panelError ? (
                 <p className='text-sm text-red-600' role='alert'>
                   {panelError}

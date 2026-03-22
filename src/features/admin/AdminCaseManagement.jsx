@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, CheckCircle, Clock, Eye, Filter, Pencil, Search, Trash2, Users } from 'lucide-react';
 
+import { AdminCaseGridSkeleton, StatCardsRowSkeleton } from '@/components/common/page-skeletons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ function capitalizeDifficulty(d) {
 
 export default function AdminCaseManagement() {
   const [cases, setCases] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('all');
@@ -42,6 +44,9 @@ export default function AdminCaseManagement() {
       })
       .catch((e) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Gagal memuat cases');
+      })
+      .finally(() => {
+        if (!cancelled) setListLoading(false);
       });
     return () => {
       cancelled = true;
@@ -87,25 +92,29 @@ export default function AdminCaseManagement() {
             {loadError}
           </p>
         ) : null}
-        <div className='grid grid-cols-2 lg:grid-cols-4 gap-4'>
-          {[
-            { label: 'Total Cases', value: summary.totalCases, icon: BookOpen, cardClass: 'from-purple-100 to-purple-50 border-purple-200 text-purple-600' },
-            { label: 'Active', value: summary.active, icon: CheckCircle, cardClass: 'from-green-100 to-green-50 border-green-200 text-green-600' },
-            { label: 'Archived', value: summary.archived, icon: Clock, cardClass: 'from-yellow-100 to-yellow-50 border-yellow-200 text-yellow-600' },
-            { label: 'Completions (UI)', value: summary.completions, icon: Users, cardClass: 'from-blue-100 to-blue-50 border-blue-200 text-blue-600' },
-          ].map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={stat.label} className={`rounded-2xl border bg-linear-to-br ${stat.cardClass}`}>
-                <CardContent className='p-5'>
-                  <Icon className='w-5 h-5 mb-2' />
-                  <div className='text-2xl font-bold text-gray-900'>{stat.value}</div>
-                  <p className='text-xs text-gray-600'>{stat.label}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        {listLoading ? (
+          <StatCardsRowSkeleton count={4} />
+        ) : (
+          <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+            {[
+              { label: 'Total Cases', value: summary.totalCases, icon: BookOpen, cardClass: 'from-purple-100 to-purple-50 border-purple-200 text-purple-600' },
+              { label: 'Active', value: summary.active, icon: CheckCircle, cardClass: 'from-green-100 to-green-50 border-green-200 text-green-600' },
+              { label: 'Archived', value: summary.archived, icon: Clock, cardClass: 'from-yellow-100 to-yellow-50 border-yellow-200 text-yellow-600' },
+              { label: 'Completions (UI)', value: summary.completions, icon: Users, cardClass: 'from-blue-100 to-blue-50 border-blue-200 text-blue-600' },
+            ].map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <Card key={stat.label} className={`rounded-2xl border bg-linear-to-br ${stat.cardClass}`}>
+                  <CardContent className='p-5'>
+                    <Icon className='mb-2 w-5 h-5' />
+                    <div className='text-2xl font-bold text-gray-900'>{stat.value}</div>
+                    <p className='text-xs text-gray-600'>{stat.label}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         <Card>
           <CardContent className='p-4'>
@@ -147,7 +156,10 @@ export default function AdminCaseManagement() {
           </CardContent>
         </Card>
 
-        <div className='grid md:grid-cols-2 lg:grid-cols-3 gap-4'>
+        {listLoading ? (
+          <AdminCaseGridSkeleton cards={6} />
+        ) : (
+          <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
           {filteredCases.map((c) => (
             <Card
               key={c.id}
@@ -208,8 +220,9 @@ export default function AdminCaseManagement() {
               </CardContent>
             </Card>
           ))}
-        </div>
-        {filteredCases.length === 0 ? (
+          </div>
+        )}
+        {!listLoading && filteredCases.length === 0 ? (
           <Card>
             <CardContent className='p-6 text-center text-sm text-gray-500'>
               No cases found with current filters.

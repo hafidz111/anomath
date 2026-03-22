@@ -3,6 +3,7 @@ import { BookOpen, ChevronDown, GraduationCap, Puzzle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { listPuzzles } from '@/lib/api/cases';
 import { cn } from '@/lib/utils';
 
@@ -114,7 +115,11 @@ export function ClassCasePuzzleHierarchy({ classes, casesByClassId, emptyHint = 
                         {expanded ? (
                           <div className='border-t border-gray-100 px-3 py-2 pl-8'>
                             {loadingCase === c.id && puzzles === undefined ? (
-                              <p className='text-xs text-gray-500'>Memuat puzzle…</p>
+                              <div className='space-y-2 py-1'>
+                                <Skeleton className='h-3 w-full' />
+                                <Skeleton className='h-3 w-5/6' />
+                                <Skeleton className='h-3 w-4/6' />
+                              </div>
                             ) : null}
                             {puzzles && puzzles.length === 0 ? (
                               <p className='text-xs text-gray-500'>Tidak ada puzzle untuk case ini.</p>

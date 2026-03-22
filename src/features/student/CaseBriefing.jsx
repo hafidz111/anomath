@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { AnomathLogo } from '@/components/branding/anomath-logo';
 import { LogoutButton } from '@/components/auth/logout-button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getCase } from '@/lib/api/cases';
@@ -55,7 +56,12 @@ export default function CaseBriefing() {
             <h1 className='text-3xl font-bold text-gray-900 mb-2'>Case Briefing</h1>
             <p className='text-gray-700'>
               Selamat datang, Detective. Sebelum mulai, pahami aturan investigasi untuk{' '}
-              {loading ? '…' : title || `Case ${caseId}`}.
+              {loading ? (
+                <Skeleton className='inline-block h-4 w-40 max-w-[min(100%,12rem)] align-middle' />
+              ) : (
+                <>{title || `Case ${caseId}`}</>
+              )}
+              .
             </p>
           </CardContent>
         </Card>

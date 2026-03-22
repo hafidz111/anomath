@@ -28,7 +28,7 @@ export function LoginForm({ className, ...props }) {
                 <Input
                   id='email'
                   type='email'
-                  placeholder='m@example.com'
+                  placeholder='Masukkan email Anda'
                   required
                 />
               </Field>
@@ -42,7 +42,12 @@ export function LoginForm({ className, ...props }) {
                     Forgot your password?
                   </a>
                 </div>
-                <Input id='password' type='password' required />
+                <Input
+                  id='password'
+                  type='password'
+                  placeholder='Masukkan password Anda'
+                  required
+                />
               </Field>
               <Field>
                 <Button type='submit' variant='outlined'>

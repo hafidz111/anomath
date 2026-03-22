@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { GraduationCap, Loader2, RefreshCw } from 'lucide-react';
+import { TableSkeletonRows } from '@/components/common/page-skeletons';
+import { GraduationCap, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { fetchAdminClasses, updateAdminClass } from '@/lib/api/admin';
 
 export default function AdminClassPublicReview() {
@@ -76,9 +78,29 @@ export default function AdminClassPublicReview() {
 
   if (loading) {
     return (
-      <main className='mx-auto flex max-w-5xl flex-col items-center justify-center gap-3 px-4 py-16 sm:px-6 lg:px-8'>
-        <Loader2 className='h-8 w-8 animate-spin text-purple-600' />
-        <p className='text-sm text-gray-500'>…</p>
+      <main className='mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8'>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <Skeleton className='h-7 w-56' />
+          <Skeleton className='h-9 w-28' />
+        </div>
+        <Skeleton className='h-16 w-full max-w-md rounded-2xl' />
+        <Card className='rounded-2xl border border-gray-200'>
+          <CardContent className='p-4'>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Kelas</TableHead>
+                  <TableHead>Guru</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className='text-right'>Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableSkeletonRows rows={5} columns={4} />
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </main>
     );
   }

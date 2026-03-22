@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, GraduationCap, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ClassListPageSkeleton } from '@/components/common/page-skeletons';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,10 +15,11 @@ import { createAdminClass, deleteAdminClass, fetchAdminClasses } from '@/lib/api
 export default function ClassManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [name, setName] = useState('');
-  const [grade, setGrade] = useState('7');
+  const [grade, setGrade] = useState('');
   const [subject, setSubject] = useState('');
   const [workMode, setWorkMode] = useState('individual');
   const nameInputRef = useRef(null);
@@ -39,6 +41,9 @@ export default function ClassManagement() {
       })
       .catch((e) => {
         if (!cancelled) toast.error(e instanceof Error ? e.message : 'Gagal memuat kelas');
+      })
+      .finally(() => {
+        if (!cancelled) setListLoading(false);
       });
     return () => {
       cancelled = true;
@@ -103,7 +108,7 @@ export default function ClassManagement() {
       if (subj) payload.subject = subj;
       await createAdminClass(payload);
       setName('');
-      setGrade('7');
+      setGrade('');
       setSubject('');
       setWorkMode('individual');
       setShowCreateModal(false);
@@ -158,7 +163,10 @@ export default function ClassManagement() {
               placeholder='Search class/teacher...'
             />
             <div className='space-y-3'>
-              {filtered.map((c) => (
+              {listLoading ? (
+                <ClassListPageSkeleton rows={5} />
+              ) : null}
+              {!listLoading ? filtered.map((c) => (
                 <div key={c.id} className='flex items-center justify-between gap-3 rounded-xl border p-4'>
                   <div>
                     <div className='flex items-center gap-2 font-semibold'>
@@ -181,8 +189,10 @@ export default function ClassManagement() {
                     </Button>
                   </div>
                 </div>
-              ))}
-              {filtered.length === 0 ? <p className='text-sm text-gray-500'>Tidak ada kelas.</p> : null}
+              )) : null}
+              {!listLoading && filtered.length === 0 ? (
+                <p className='text-sm text-gray-500'>Tidak ada kelas.</p>
+              ) : null}
             </div>
           </CardContent>
         </Card>
