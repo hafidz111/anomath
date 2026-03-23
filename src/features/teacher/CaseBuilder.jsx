@@ -217,6 +217,8 @@ export default function CaseBuilder() {
 
   /** Hindari skeleton penuh saat `caseUuid` baru dari POST draft (state sudah diisi dari response). */
   const skipNextCaseFetchUnloadRef = useRef(false);
+  /** Kartu "Case Anda (server)" — fetch sekali per kunjungan tahap 4. */
+  const myCasesPreviewFetchStartedRef = useRef(false);
 
   /**
    * Indeks tahap wizard tertinggi yang sudah pernah disimpan di server (draft).
@@ -264,7 +266,12 @@ export default function CaseBuilder() {
     }
   }, [builderStep]);
 
+  /** Daftar kelas: butuh segera jika ada `classCode` di URL; jika tidak, baru saat tahap Validasi (≥3). */
   useEffect(() => {
+    const needForUrl = Boolean(classCodeParam);
+    const needForValidation = !classCodeParam && builderStep >= 3;
+    if (!needForUrl && !needForValidation) return;
+    if (classOptions.length > 0) return;
     let cancelled = false;
     (async () => {
       try {
@@ -286,7 +293,7 @@ export default function CaseBuilder() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [classCodeParam, builderStep, classOptions.length]);
 
   useEffect(() => {
     if (!classCodeParam || !classOptions.length) return;
@@ -297,6 +304,14 @@ export default function CaseBuilder() {
   }, [classCodeParam, classOptions]);
 
   useEffect(() => {
+    myCasesPreviewFetchStartedRef.current = false;
+  }, [caseUuidParam]);
+
+  /** Pratinjau "Case Anda (server)" hanya di tahap Publish. */
+  useEffect(() => {
+    if (builderStep !== 4) return;
+    if (myCasesPreviewFetchStartedRef.current) return;
+    myCasesPreviewFetchStartedRef.current = true;
     let cancelled = false;
     (async () => {
       try {
@@ -313,7 +328,7 @@ export default function CaseBuilder() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [builderStep]);
 
   const applyServerCaseToBuilderState = useCallback(
     (c, opts = {}) => {
@@ -859,12 +874,23 @@ export default function CaseBuilder() {
       };
 
       if (classCodeParam) {
-        const data = await fetchAdminClasses({ page_size: 500 });
-        const classes = data?.classes ?? [];
-        const found = classes.find(
+        let rows = classOptions;
+        if (rows.length === 0) {
+          try {
+            const data = await fetchAdminClasses({ page_size: 500 });
+            rows = (data?.classes ?? []).map((c) => ({
+              id: String(c.id),
+              name: c.name,
+              code: buildClassCode(c),
+            }));
+            setClassOptions(rows);
+          } catch {
+            rows = [];
+          }
+        }
+        const found = rows.find(
           (c) =>
-            buildClassCode(c) === classCodeParam ||
-            String(c.id) === classCodeParam,
+            c.code === classCodeParam || c.id === classCodeParam,
         );
         if (found) {
           await mergeIds(found.id);
@@ -881,7 +907,7 @@ export default function CaseBuilder() {
       }
       return false;
     },
-    [classCodeParam, targetClass],
+    [classCodeParam, targetClass, classOptions],
   );
 
   const createCaseWithFirstPuzzleForEmbedded = async () => {

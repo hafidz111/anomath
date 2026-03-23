@@ -8,7 +8,11 @@ import { AnomathLogo } from '@/components/branding/anomath-logo';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getCase, listPuzzles, sortPuzzlesByOrder } from '@/lib/api/cases';
+import {
+  extractPuzzlesFromCase,
+  getCase,
+  sortPuzzlesByOrder,
+} from '@/lib/api/cases';
 import { getProgress } from '@/lib/api/progress';
 
 const difficultyTheme = {
@@ -32,15 +36,15 @@ export default function CaseStory() {
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
+    /** Satu GET case — hindari `listPuzzles` + `getCase` (dua kali GET yang sama). */
     Promise.all([
       getCase(caseId),
-      listPuzzles(caseId),
       getProgress(caseId).catch(() => null),
     ])
-      .then(([c, pz, prog]) => {
+      .then(([c, prog]) => {
         if (cancelled) return;
         setCaseData(c);
-        setSortedPuzzles(sortPuzzlesByOrder(pz?.puzzles || []));
+        setSortedPuzzles(sortPuzzlesByOrder(extractPuzzlesFromCase(c)));
         setProgressRow(prog && prog.case_id ? prog : null);
       })
       .catch((e) => {

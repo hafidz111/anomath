@@ -17,10 +17,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
+  extractPuzzlesFromCase,
   findPuzzleByStage,
-  getCase,
   getFirstPuzzleOrder,
-  listPuzzles,
+  getCase,
   sortPuzzlesByOrder,
   submitPuzzleAnswer,
 } from '@/lib/api/cases';
@@ -67,15 +67,15 @@ export default function PuzzleGame() {
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
+    /** Satu GET case saja — `listPuzzles` memanggil `getCase` lagi secara internal. */
     Promise.all([
       getCase(caseId),
-      listPuzzles(caseId),
       getProgress(caseId).catch(() => null),
     ])
-      .then(([c, pz, prog]) => {
+      .then(([c, prog]) => {
         if (cancelled) return;
         setCaseTitle(c?.title || '');
-        setPuzzles(sortPuzzlesByOrder(pz?.puzzles || []));
+        setPuzzles(sortPuzzlesByOrder(extractPuzzlesFromCase(c)));
         setProgressRow(prog && prog.case_id ? prog : null);
       })
       .catch((e) => {

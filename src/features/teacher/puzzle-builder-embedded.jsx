@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 import {
   Check,
@@ -234,9 +240,37 @@ export function PuzzleBuilderEmbedded({
   const [answers, setAnswers] = useState(emptyAnswerSlots);
   const [casePuzzlesRaw, setCasePuzzlesRaw] = useState(undefined);
   const lastHydrateKey = useRef('');
+  const casePuzzlesRawRef = useRef(casePuzzlesRaw);
+
+  /** URL punya `puzzleId` ⇒ selalu editor; tanpa itu pakai state (list vs tambah baru). */
+  const effectiveUiMode = puzzleId ? 'edit' : uiMode;
+
+  /** Daftar dari parent (CaseBuilder) — diurutkan; hindari setState di efek untuk mirror props. */
+  const parentPuzzleListSorted = useMemo(() => {
+    if (!Array.isArray(parentPuzzleList)) return null;
+    return sortPuzzlesByOrder(parentPuzzleList);
+  }, [parentPuzzleList]);
+
+  /** Tanpa `caseId` jangan tampilkan cache puzzle case sebelumnya; prioritas daftar dari parent. */
+  const puzzleListForCase = caseId
+    ? (parentPuzzleListSorted != null ? parentPuzzleListSorted : casePuzzlesRaw)
+    : undefined;
+
+  useLayoutEffect(() => {
+    casePuzzlesRawRef.current = puzzleListForCase;
+  });
+
+  /** Hanya berubah saat urutan/id puzzle berubah — kurangi re-run efek hydrate & getPuzzle. */
+  const puzzleListIdsKey = useMemo(
+    () =>
+      (puzzleListForCase ?? [])
+        .map((p) => String(p?.id ?? ''))
+        .join('|'),
+    [puzzleListForCase],
+  );
 
   const puzzleLimit = Math.max(1, Number(maxPuzzleCount) || 1);
-  const puzzleCount = (casePuzzlesRaw ?? []).length;
+  const puzzleCount = (puzzleListForCase ?? []).length;
   const atPuzzleLimit = Boolean(caseId) && puzzleCount >= puzzleLimit;
   const overPuzzleLimit = Boolean(caseId) && puzzleCount > puzzleLimit;
 
@@ -266,26 +300,11 @@ export function PuzzleBuilderEmbedded({
   };
 
   useEffect(() => {
-    if (puzzleId) setUiMode('edit');
-  }, [puzzleId]);
+    onPuzzleBuilderUiModeChange?.(effectiveUiMode);
+  }, [effectiveUiMode, onPuzzleBuilderUiModeChange]);
 
   useEffect(() => {
-    onPuzzleBuilderUiModeChange?.(uiMode);
-  }, [uiMode, onPuzzleBuilderUiModeChange]);
-
-  useEffect(() => {
-    if (!caseId) {
-      setCasePuzzlesRaw(undefined);
-      return;
-    }
-    if (Array.isArray(parentPuzzleList)) {
-      setCasePuzzlesRaw(sortPuzzlesByOrder(parentPuzzleList));
-      return;
-    }
-    if (parentPuzzleList === null) {
-      setCasePuzzlesRaw(undefined);
-      return;
-    }
+    if (!caseId || parentPuzzleList !== undefined) return;
     let cancelled = false;
     listPuzzles(caseId)
       .then((data) => {
@@ -302,6 +321,7 @@ export function PuzzleBuilderEmbedded({
 
   useEffect(() => {
     const key = `${caseId ?? ''}|${puzzleId || 'new'}`;
+    const list = casePuzzlesRawRef.current;
 
     if (!caseId) {
       if (!puzzleId && lastHydrateKey.current !== key) {
@@ -311,7 +331,7 @@ export function PuzzleBuilderEmbedded({
       return;
     }
 
-    if (casePuzzlesRaw === undefined) return;
+    if (list === undefined) return;
 
     if (!puzzleId) {
       if (lastHydrateKey.current !== key) {
@@ -321,9 +341,7 @@ export function PuzzleBuilderEmbedded({
       return;
     }
 
-    const fromList = casePuzzlesRaw.find(
-      (x) => String(x.id) === String(puzzleId),
-    );
+    const fromList = list.find((x) => String(x.id) === String(puzzleId));
     if (fromList) {
       if (lastHydrateKey.current === key) return;
       lastHydrateKey.current = key;
@@ -347,11 +365,11 @@ export function PuzzleBuilderEmbedded({
     return () => {
       cancelled = true;
     };
-  }, [caseId, puzzleId, casePuzzlesRaw]);
+  }, [caseId, puzzleId, puzzleListIdsKey]);
 
   useEffect(() => {
     if (!onLivePreviewChange) return;
-    if (uiMode === 'list') {
+    if (effectiveUiMode === 'list') {
       onLivePreviewChange(null);
       return;
     }
@@ -360,9 +378,9 @@ export function PuzzleBuilderEmbedded({
       question,
       answers,
     });
-  }, [uiMode, puzzleType, question, answers, onLivePreviewChange]);
+  }, [effectiveUiMode, puzzleType, question, answers, onLivePreviewChange]);
 
-  const listLoading = Boolean(caseId && casePuzzlesRaw === undefined);
+  const listLoading = Boolean(caseId && puzzleListForCase === undefined);
 
   const mergeSavedIntoList = (list, response, form) => {
     const saved = normalizePuzzleSaveResponse(response);
@@ -406,8 +424,10 @@ export function PuzzleBuilderEmbedded({
       difficulty: mergeFromSave.difficulty ?? '',
     };
     setCasePuzzlesRaw((prev) => {
+      const base =
+        parentPuzzleListSorted != null ? parentPuzzleListSorted : (prev ?? []);
       const merged = mergeSavedIntoList(
-        prev ?? [],
+        base,
         mergeFromSave.response,
         form,
       );
@@ -422,8 +442,10 @@ export function PuzzleBuilderEmbedded({
       await deletePuzzle(id);
       toast.success('Puzzle dihapus.');
       setCasePuzzlesRaw((prev) => {
+        const base =
+          parentPuzzleListSorted != null ? parentPuzzleListSorted : (prev ?? []);
         const next = sortPuzzlesByOrder(
-          (prev ?? []).filter((x) => String(x.id) !== String(id)),
+          base.filter((x) => String(x.id) !== String(id)),
         );
         onPuzzleListSync?.(next);
         return next;
@@ -604,7 +626,7 @@ export function PuzzleBuilderEmbedded({
 
   useEffect(() => {
     if (!onEditorMetaChange) return;
-    if (uiMode === 'list') {
+    if (effectiveUiMode === 'list') {
       onEditorMetaChange(null);
       return;
     }
@@ -616,7 +638,7 @@ export function PuzzleBuilderEmbedded({
       saveLabel: puzzleId ? 'Perbarui puzzle' : 'Simpan puzzle',
     });
   }, [
-    uiMode,
+    effectiveUiMode,
     canSubmit,
     storedAnswerOk,
     question,
@@ -644,13 +666,13 @@ export function PuzzleBuilderEmbedded({
           <div>
             <h2 className='text-2xl font-bold text-gray-900'>Math Puzzles</h2>
             <p className='text-sm text-gray-500'>
-              {uiMode === 'list'
+              {effectiveUiMode === 'list'
                 ? `Kelola soal untuk case ini — maksimal ${puzzleLimit} puzzle (sama dengan jumlah tahap di Case Info).`
                 : 'Isi form lalu simpan — editor akan tertutup kembali ke daftar.'}
             </p>
           </div>
         </div>
-        {uiMode === 'list' ? (
+        {effectiveUiMode === 'list' ? (
           <Button
             type='button'
             onClick={openNewPuzzleEditor}
@@ -690,7 +712,7 @@ export function PuzzleBuilderEmbedded({
         </div>
       ) : null}
 
-      {uiMode === 'list' ? (
+      {effectiveUiMode === 'list' ? (
         <Card className='rounded-3xl border border-gray-200 shadow-sm'>
           <CardContent className='p-8'>
             <h3 className='mb-4 text-lg font-bold text-gray-900'>
@@ -703,13 +725,13 @@ export function PuzzleBuilderEmbedded({
                 <p className='text-sm text-gray-500'>
                   Belum ada case. Tambah puzzle akan membuat case di server.
                 </p>
-              ) : (casePuzzlesRaw ?? []).length === 0 ? (
+              ) : (puzzleListForCase ?? []).length === 0 ? (
                 <p className='rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-8 text-center text-sm text-gray-600'>
                   Belum ada puzzle. Gunakan{' '}
                   <span className='font-medium'>Tambah puzzle</span> di atas.
                 </p>
               ) : (
-                (casePuzzlesRaw ?? []).map((puzzle, i) => (
+                (puzzleListForCase ?? []).map((puzzle, i) => (
                   <div
                     key={puzzle.id}
                     className={`flex flex-col gap-2 rounded-xl border bg-linear-to-br p-4 sm:flex-row sm:items-center sm:justify-between ${ROW_THEMES[i % ROW_THEMES.length]}`}

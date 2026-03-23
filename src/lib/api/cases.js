@@ -156,7 +156,11 @@ export function deleteCase(caseId) {
   });
 }
 
-/** Daftar puzzle = GET /api/cases/:id/ (field `puzzles` atau alias relasi). */
+/**
+ * Daftar puzzle = satu GET /api/cases/:id/ (field `puzzles` atau alias relasi).
+ * Jangan memanggil bersamaan dengan `getCase(caseId)` untuk id yang sama — gabungkan
+ * dari satu respons `getCase` + `extractPuzzlesFromCase(c)` agar hemat backend.
+ */
 export function listPuzzles(caseId) {
   return getCase(caseId).then((c) => ({
     puzzles: extractPuzzlesFromCase(c),

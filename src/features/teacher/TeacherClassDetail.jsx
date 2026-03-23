@@ -164,8 +164,7 @@ export default function TeacherClassDetail() {
     }
     try {
       if (classDetail?.id) {
-        const detail = await fetchAdminClass(classDetail.id);
-        const ids = (detail?.cases ?? [])
+        const ids = (classDetail?.cases ?? [])
           .map((x) => getCaseRecordApiId(x))
           .filter(Boolean);
         if (ids.includes(caseId)) {
